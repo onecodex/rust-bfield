@@ -1,0 +1,13 @@
+[package]
+name = "bfield"
+version = "0.1.0"
+authors = ["Roderick Bovee <roderick@onecodex.com>"]
+
+[dependencies]
+bincode = "0.8.1"
+mmap-bitvec = { version="0.1.0", path="../mmap-bitvec", features=["u128"] }
+serde = "1.0.15"
+serde_derive = "1.0.15"
+
+[features]
+marker_lookup = []
