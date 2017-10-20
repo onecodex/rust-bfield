@@ -4,10 +4,13 @@ version = "0.1.0"
 authors = ["Roderick Bovee <roderick@onecodex.com>"]
 
 [dependencies]
-bincode = "0.8.1"
-mmap-bitvec = { version="0.1.0", path="../mmap-bitvec", features=["u128"] }
+bincode = "0.9.2"
+mmap-bitvec = { version = "0.1.0", path = "../mmap-bitvec", features = ["u128"] }
+murmurhash3 = "0.0.5"
 serde = "1.0.15"
 serde_derive = "1.0.15"
+serde_json = { version = "1.0.4", optional = true}
 
 [features]
 marker_lookup = []
+legacy = ["mmap-bitvec/backward_bytes", "serde_json"]

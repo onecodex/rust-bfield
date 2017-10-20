@@ -1,4 +1,3 @@
-use std::hash::Hash;
 use std::io;
 use std::path::Path;
 
@@ -7,9 +6,12 @@ use bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
 
 pub struct BField {
     members: Vec<BFieldMember>,
+    read_only: bool,
 }
 
 impl BField {
+    // the hashing is different, so we don't want to accidentally create file in legacy mode
+    #[cfg(not(feature = "legacy"))]
     pub fn create<P>(
         filename: P,
         size: usize,
@@ -31,26 +33,8 @@ impl BField {
                 Path::file_stem(filename.as_ref()).unwrap().as_ref(),
                 format!("{}.bfd", n),
             );
-            let next_file = if n < n_secondaries - 1 {
-                Some(
-                    Path::with_extension(
-                        Path::file_stem(filename.as_ref()).unwrap().as_ref(),
-                        format!("{}.bfd", n + 1),
-                    ).to_str()
-                        .unwrap()
-                        .to_string(),
-                )
-            } else {
-                None
-            };
-            let member = BFieldMember::create(
-                file,
-                cur_size,
-                n_hashes,
-                marker_width,
-                n_marker_bits,
-                next_file,
-            )?;
+            let member =
+                BFieldMember::create(file, cur_size, n_hashes, marker_width, n_marker_bits)?;
             members.push(member);
             cur_size = f64::max(
                 cur_size as f64 * secondary_scaledown,
@@ -58,40 +42,78 @@ impl BField {
             ) as usize;
         }
 
-        Ok(BField { members: members })
+        Ok(BField {
+            members: members,
+            read_only: false,
+        })
     }
 
+    #[cfg(not(feature = "legacy"))]
     pub fn from_file<P>(filename: P, read_only: bool) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
     {
-        let mut member_filename: String = filename.as_ref().to_str().unwrap().to_string();
         let mut members = Vec::new();
+        let mut n = 0;
         loop {
+            let member_filename = Path::with_extension(
+                Path::file_stem(filename.as_ref()).unwrap().as_ref(),
+                format!("{}.bfd", n),
+            );
+            if !member_filename.exists() {
+                break;
+            }
             let member = BFieldMember::open(&member_filename, read_only)?;
-            let secondary = member.secondary();
             members.push(member);
-            match secondary {
-                Some(filename) => member_filename = filename,
-                None => break,
+            n += 1;
+        }
+        Ok(BField {
+            members: members,
+            read_only: read_only,
+        })
+    }
+
+    #[cfg(feature = "legacy")]
+    pub fn from_file<P>(filename: P, _: bool) -> Result<Self, io::Error>
+    where
+        P: AsRef<Path>,
+    {
+        let first_member = BFieldMember::open_legacy(&filename)?;
+        let mut members = vec![first_member];
+        let mut n = 1;
+        loop {
+            let member_filename = Path::with_extension(
+                Path::file_stem(filename.as_ref()).unwrap().as_ref(),
+                format!("mmap.secondary.{:03}", n),
+            );
+            if !member_filename.exists() {
+                break;
+            }
+            let member = BFieldMember::open_legacy(&member_filename)?;
+            members.push(member);
+            n += 1;
+        }
+        Ok(BField {
+            members: members,
+            read_only: true,
+        })
+    }
+
+    pub fn insert(&mut self, key: &[u8], value: BFieldVal, pass: usize) {
+        debug_assert!(!self.read_only, "Can't insert into read_only bfields");
+        debug_assert!(
+            pass < self.members.len(),
+            "Can't have more passes than bfield members"
+        );
+        if pass > 0 {
+            if self.members[pass].get(&key) != BFieldLookup::Indeterminate {
+                return;
             }
         }
-        Ok(BField { members: members })
+        self.members[pass].insert(&key, value);
     }
 
-    pub fn insert<H>(&mut self, key: H, value: BFieldVal)
-    where
-        H: Hash,
-    {
-        for secondary in self.members.iter() {
-            unimplemented!();
-        }
-    }
-
-    pub fn get<H>(&self, key: H) -> Option<BFieldVal>
-    where
-        H: Hash,
-    {
+    pub fn get(&self, key: &[u8]) -> Option<BFieldVal> {
         for secondary in self.members.iter() {
             match secondary.get(&key) {
                 BFieldLookup::Indeterminate => continue,
@@ -103,4 +125,13 @@ impl BField {
         // or return a Result<Option<BFieldVal>, ...> instead?
         None
     }
+}
+
+#[cfg(feature = "legacy")]
+#[test]
+fn test_legacy() {
+    let bf = BField::from_file("./test_data/legacy/test_bfield.mmap", true).unwrap();
+    assert_eq!(bf.get(b"Hello"), Some(0));
+    assert_eq!(bf.get(b"Not here."), None);
+    assert_eq!(bf.get(b"Hello again"), Some(0));
 }

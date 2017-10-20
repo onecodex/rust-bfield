@@ -1,5 +1,5 @@
 
-use mmap_bitvec::{BitVec, BitVecSlice};
+use mmap_bitvec::BitVecSlice;
 use bfield_member::BFieldVal;
 
 #[cfg(marker_lookup)]
