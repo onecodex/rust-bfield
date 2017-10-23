@@ -126,7 +126,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
             "Can't have more passes than bfield members"
         );
         if pass > 0 {
-            if self.members[pass].get(&key) != BFieldLookup::Indeterminate {
+            if self.members[pass - 1].get(&key) != BFieldLookup::Indeterminate {
                 return;
             }
         }

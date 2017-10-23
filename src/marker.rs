@@ -32,15 +32,15 @@ fn test_to_marker() {
 pub fn from_marker(marker: BitVecSlice) -> BFieldVal {
     // val = choose(rank(0), 1) + choose(rank(1), 2) + choose(rank(2), 3) + ...
     let mut working_marker = marker;
-    let mut value = 0;
+    let mut value = 0u64;
     let mut idx = 0;
     while working_marker != 0 {
-        let rank = working_marker.trailing_zeros();
+        let rank = working_marker.trailing_zeros() as u64;
         working_marker -= 1 << rank;
         idx += 1;
         value += choose(rank, idx);
     }
-    value
+    value as BFieldVal
 }
 
 #[test]
@@ -59,8 +59,12 @@ fn test_to_and_from_marker() {
     }
 }
 
+/// (Hopefully) fast implementation of a binomial
+/// 
+/// This may overflow for k > 9 (with n = 128), but hopefully
+/// that doesn't happen
 #[inline]
-fn choose(n: u32, k: u8) -> u32 {
+fn choose(n: u64, k: u8) -> u64 {
     match k {
         1 => n,
         2 => n * (n - 1) / 2,
