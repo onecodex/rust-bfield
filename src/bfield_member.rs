@@ -7,6 +7,8 @@ use std::path::Path;
 use bincode::{serialize, deserialize, Infinite};
 use mmap_bitvec::{BitVec, BitVecSlice};
 use murmurhash3::murmurhash3_x64_128;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 #[cfg(feature = "legacy")]
 use serde_json;
 
@@ -14,15 +16,16 @@ use marker::{from_marker, to_marker};
 
 
 #[derive(Debug, Deserialize, Serialize)]
-struct BFieldParams {
+pub(crate) struct BFieldParams<T> {
     n_hashes: u8, // k
     marker_width: u8, // nu
     n_marker_bits: u8, // kappa
+    pub(crate) other: Option<T>,
 }
 
-pub(crate) struct BFieldMember {
-    pub bitvec: BitVec, // FIXME
-    params: BFieldParams,
+pub(crate) struct BFieldMember<T> {
+    bitvec: BitVec,
+    pub(crate) params: BFieldParams<T>,
 }
 
 pub type BFieldVal = u32;
@@ -35,13 +38,14 @@ pub(crate) enum BFieldLookup {
     None,
 }
 
-impl BFieldMember {
+impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     pub fn create<P>(
         filename: P,
         size: usize,
         n_hashes: u8,
         marker_width: u8,
         n_marker_bits: u8,
+        other_params: Option<T>,
     ) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
@@ -50,6 +54,7 @@ impl BFieldMember {
             n_hashes: n_hashes,
             marker_width: marker_width,
             n_marker_bits: n_marker_bits,
+            other: other_params,
         };
 
         let header: Vec<u8> = serialize(&bf_params, Infinite).unwrap();
@@ -66,7 +71,7 @@ impl BFieldMember {
         P: AsRef<Path>,
     {
         let bv = BitVec::open(filename, Some(&BF_MAGIC), read_only)?;
-        let bf_params: BFieldParams = {
+        let bf_params: BFieldParams<T> = {
             let header = bv.header();
             deserialize(&header[..]).unwrap()
         };
@@ -94,6 +99,7 @@ impl BFieldMember {
             n_hashes: params.get(3).unwrap().as_u64().unwrap() as u8, // k
             marker_width: params.get(4).unwrap().as_u64().unwrap() as u8, // nu
             n_marker_bits: params.get(5).unwrap().as_u64().unwrap() as u8, // kappa
+            other: None,
         };
         // finally, open the bfield itself
         let bv = BitVec::open_no_header(filename, 8)?;
@@ -114,6 +120,7 @@ impl BFieldMember {
             n_hashes: n_hashes,
             marker_width: marker_width,
             n_marker_bits: n_marker_bits,
+            other: None,
         };
 
         let bv = BitVec::from_memory(size)?;

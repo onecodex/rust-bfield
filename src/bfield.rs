@@ -1,15 +1,18 @@
 use std::io;
 use std::path::Path;
 
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+
 use bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
 
 
-pub struct BField {
-    members: Vec<BFieldMember>,
+pub struct BField<T> {
+    members: Vec<BFieldMember<T>>,
     read_only: bool,
 }
 
-impl BField {
+impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
     // the hashing is different, so we don't want to accidentally create file in legacy mode
     #[cfg(not(feature = "legacy"))]
     pub fn create<P>(
@@ -21,6 +24,7 @@ impl BField {
         secondary_scaledown: f64, // beta
         max_scaledown: f64,
         n_secondaries: u8,
+        other_params: T,
     ) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
@@ -33,8 +37,13 @@ impl BField {
                 Path::file_stem(filename.as_ref()).unwrap().as_ref(),
                 format!("{}.bfd", n),
             );
+            let params = if n == 0 {
+                Some(other_params.clone())
+            } else {
+                None
+            };
             let member =
-                BFieldMember::create(file, cur_size, n_hashes, marker_width, n_marker_bits)?;
+                BFieldMember::create(file, cur_size, n_hashes, marker_width, n_marker_bits, params)?;
             members.push(member);
             cur_size = f64::max(
                 cur_size as f64 * secondary_scaledown,
@@ -97,6 +106,17 @@ impl BField {
             members: members,
             read_only: true,
         })
+    }
+
+    pub fn params(&self) -> &Option<T> {
+        &self.members[0].params.other
+    }
+
+    /// This doesn't actually update the file, so we can use it to e.g.
+    /// simulate params on an old legacy file that may not actually have
+    /// them set.
+    pub fn mock_params(&mut self, params: T) {
+        self.members[0].params.other = Some(params);
     }
 
     pub fn insert(&mut self, key: &[u8], value: BFieldVal, pass: usize) {
