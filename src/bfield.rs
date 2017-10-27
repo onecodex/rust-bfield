@@ -76,6 +76,12 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
             members.push(member);
             n += 1;
         }
+        if members.len() == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("No Bfield found at {:?}", filename.as_ref())
+            ));
+        }
         Ok(BField {
             members: members,
             read_only: read_only,
@@ -150,7 +156,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
 #[cfg(feature = "legacy")]
 #[test]
 fn test_legacy() {
-    let bf = BField::from_file("./test_data/legacy/test_bfield.mmap", true).unwrap();
+    let bf: BField<usize> = BField::from_file("./test_data/legacy/test_bfield.mmap", true).unwrap();
     assert_eq!(bf.get(b"Hello"), Some(0));
     assert_eq!(bf.get(b"Not here."), None);
     assert_eq!(bf.get(b"Hello again"), Some(0));

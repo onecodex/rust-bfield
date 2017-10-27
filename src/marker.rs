@@ -53,7 +53,7 @@ fn test_from_marker() {
 #[test]
 fn test_to_and_from_marker() {
     for k in 1..4u8 {
-        for value in [1 as BFieldVal, 45, 76].iter() {
+        for value in [1 as BFieldVal, 23, 45].iter() {
             assert_eq!(from_marker(to_marker(*value, k)), *value);
         }
     }

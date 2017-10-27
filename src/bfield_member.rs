@@ -227,7 +227,7 @@ fn marker_pos(hash: (u64, u64), n: usize, total_size: usize, _: usize) -> usize 
 
 #[test]
 fn test_bfield() {
-    let mut bfield = BFieldMember::in_memory(1024, 3, 64, 4).unwrap();
+    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(1024, 3, 64, 4).unwrap();
     // check that inserting keys adds new entries
     bfield.insert(b"test", 2);
     assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
@@ -242,7 +242,7 @@ fn test_bfield() {
 #[test]
 fn test_bfield_collisions() {
     // comically small bfield with too many hashes to cause saturation
-    let mut bfield = BFieldMember::in_memory(128, 100, 16, 4).unwrap();
+    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 100, 16, 4).unwrap();
 
     bfield.insert(b"test", 100);
     assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
