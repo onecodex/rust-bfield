@@ -5,7 +5,7 @@ use std::io;
 use std::path::Path;
 
 use bincode::{serialize, deserialize, Infinite};
-use mmap_bitvec::{BitVec, BitVecSlice};
+use mmap_bitvec::{BitVector, MmapBitVec, BitVecSlice};
 use murmurhash3::murmurhash3_x64_128;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -24,7 +24,7 @@ pub(crate) struct BFieldParams<T> {
 }
 
 pub(crate) struct BFieldMember<T> {
-    bitvec: BitVec,
+    bitvec: MmapBitVec,
     pub(crate) params: BFieldParams<T>,
 }
 
@@ -58,7 +58,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         };
 
         let header: Vec<u8> = serialize(&bf_params, Infinite).unwrap();
-        let bv = BitVec::create(filename, size, &BF_MAGIC, &header)?;
+        let bv = MmapBitVec::create(filename, size, &BF_MAGIC, &header)?;
 
         Ok(BFieldMember {
             bitvec: bv,
@@ -70,7 +70,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     where
         P: AsRef<Path>,
     {
-        let bv = BitVec::open(filename, Some(&BF_MAGIC), read_only)?;
+        let bv = MmapBitVec::open(filename, Some(&BF_MAGIC), read_only)?;
         let bf_params: BFieldParams<T> = {
             let header = bv.header();
             deserialize(&header[..]).unwrap()
@@ -102,7 +102,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             other: None,
         };
         // finally, open the bfield itself
-        let bv = BitVec::open_no_header(filename, 8)?;
+        let bv = MmapBitVec::open_no_header(filename, 8)?;
 
         Ok(BFieldMember {
             bitvec: bv,
@@ -123,7 +123,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             other: None,
         };
 
-        let bv = BitVec::from_memory(size)?;
+        let bv = MmapBitVec::from_memory(size)?;
 
         Ok(BFieldMember {
             bitvec: bv,
