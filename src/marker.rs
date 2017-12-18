@@ -1,17 +1,40 @@
+#![cfg_attr(feature = "const_fn", feature(marker_lookup))]
 
 use mmap_bitvec::BitVecSlice;
 use bfield_member::BFieldVal;
 
-#[cfg(marker_lookup)]
+#[cfg(feature = "marker_lookup")]
+const MARKER_TABLE_SIZE: usize = 200000;
+#[cfg(feature = "marker_lookup")]
+static mut MARKER_TABLE: [BitVecSlice; MARKER_TABLE_SIZE] = [0; MARKER_TABLE_SIZE];
+#[cfg(feature = "marker_lookup")]
+static mut MARKER_BITS: u8 = 0;
+
+#[cfg(feature = "marker_lookup")]
 pub fn to_marker(value: BFieldVal, k: u8) -> BitVecSlice {
-    let mut marker = (1 << k) - 1 as BitVecSlice;
-    for _ in 0..value {
-        marker = next_marker(marker)
+    unsafe {
+        if MARKER_BITS != k {
+            MARKER_BITS = k;
+            MARKER_TABLE = [0; MARKER_TABLE_SIZE];
+            MARKER_TABLE[0] = (1 << k) - 1 as BitVecSlice;
+            for i in 1..MARKER_TABLE_SIZE {
+                MARKER_TABLE[i] = next_marker(MARKER_TABLE[i - 1]);
+            }
+        }
+        if value as usize >= MARKER_TABLE_SIZE {
+            let mut marker = MARKER_TABLE[MARKER_TABLE_SIZE - 1];
+            for _ in 0..(value as usize - MARKER_TABLE_SIZE) {
+                marker = next_marker(marker);
+            }
+            marker
+        } else {
+            MARKER_TABLE[value as usize]
+        }
     }
-    marker
 }
 
-#[cfg(not(marker_lookup))]
+
+#[cfg(not(feature = "marker_lookup"))]
 pub fn to_marker(value: BFieldVal, k: u8) -> BitVecSlice {
     // set the appropriate number of bits in the marker
     let mut marker = (1 << k) - 1 as BitVecSlice;
