@@ -125,7 +125,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         self.members[0].params.other = Some(params);
     }
 
-    pub fn insert(&mut self, key: &[u8], value: BFieldVal, pass: usize) {
+    pub fn insert(&mut self, key: &[u8], value: BFieldVal, pass: usize) -> bool {
         debug_assert!(!self.read_only, "Can't insert into read_only bfields");
         debug_assert!(
             pass < self.members.len(),
@@ -133,10 +133,11 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         );
         if pass > 0 {
             if self.members[pass - 1].get(&key) != BFieldLookup::Indeterminate {
-                return;
+                return false;
             }
         }
         self.members[pass].insert(&key, value);
+        true
     }
 
     pub fn get(&self, key: &[u8]) -> Option<BFieldVal> {
