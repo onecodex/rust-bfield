@@ -142,11 +142,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     fn insert_raw(&mut self, key: &[u8], marker: BitVecSlice) {
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
-
-        #[cfg(feature = "legacy")]
         let aligned_marker = align_bits(marker, marker_width);
-        #[cfg(not(feature = "legacy"))]
-        let aligned_marker = marker;
 
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);

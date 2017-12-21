@@ -5,6 +5,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
+use marker::{to_marker};
 
 
 pub struct BField<T> {
@@ -50,6 +51,10 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
                 size as f64 * max_scaledown,
             ) as usize;
         }
+
+        // Initialize our marker table, so we don't
+        // have any race conditions across threads
+        let _ = to_marker(0, n_marker_bits);
 
         Ok(BField {
             members: members,
@@ -132,8 +137,11 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
             "Can't have more passes than bfield members"
         );
         if pass > 0 {
-            if self.members[pass - 1].get(&key) != BFieldLookup::Indeterminate {
-                return false;
+            for secondary in self.members[..pass].iter() {
+                match secondary.get(&key) {
+                    BFieldLookup::Indeterminate => continue,
+                    _ => return false,
+                }
             }
         }
         self.members[pass].insert(&key, value);

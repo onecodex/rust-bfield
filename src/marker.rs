@@ -50,6 +50,12 @@ pub fn to_marker(value: BFieldVal, k: u8) -> BitVecSlice {
 fn test_to_marker() {
     assert_eq!(to_marker(0, 3), 7);
     assert_eq!(to_marker(2, 3), 13);
+    assert_eq!(to_marker(0, 3).count_ones(), 3);
+    assert_eq!(to_marker(2, 3).count_ones(), 3);
+    assert_eq!(to_marker(35001, 4).count_ones(), 4);
+
+    // Maximum value of 64 choose 3
+    assert_eq!(to_marker(41663, 3).count_ones(), 3);
 }
 
 pub fn from_marker(marker: BitVecSlice) -> BFieldVal {
@@ -83,7 +89,7 @@ fn test_to_and_from_marker() {
 }
 
 /// (Hopefully) fast implementation of a binomial
-/// 
+///
 /// This may overflow for k > 9 (with n = 128), but hopefully
 /// that doesn't happen
 #[inline]
