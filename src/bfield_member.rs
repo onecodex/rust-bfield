@@ -243,3 +243,16 @@ fn test_bfield_collisions() {
     bfield.insert(b"test", 100);
     assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
 }
+
+#[test]
+fn test_bfield_bits_set() {
+    // comically small bfield with too many hashes to cause saturation
+    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 2, 16, 4).unwrap();
+
+    bfield.insert(b"test", 100);
+    assert_eq!(bfield.bitvec.rank(0..128), 8);
+    bfield.insert(b"test2", 200);
+    assert_eq!(bfield.bitvec.rank(0..128), 16);
+    bfield.insert(b"test3", 300);
+    assert!(bfield.bitvec.rank(0..128) < 24);  // 23 bits set
+}
