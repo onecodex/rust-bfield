@@ -70,10 +70,10 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         let mut members = Vec::new();
         let mut n = 0;
         loop {
-            let member_filename = Path::with_extension(
+            let member_filename = filename.as_ref().with_file_name(Path::with_extension(
                 Path::file_stem(filename.as_ref()).unwrap().as_ref(),
                 format!("{}.bfd", n),
-            );
+            ));
             if !member_filename.exists() {
                 break;
             }
