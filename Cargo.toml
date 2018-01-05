@@ -5,7 +5,7 @@ authors = ["Roderick Bovee <roderick@onecodex.com>"]
 
 [dependencies]
 bincode = "0.9.2"
-mmap-bitvec = { version = "0.1.0", path = "../mmap-bitvec" }
+mmap-bitvec = { git = "ssh://git@github.com/onecodex/mmap-bitvec.git", rev = "171bf99df62ea3a1c57279d3ef2b99efdc490aba" }
 murmurhash3 = "0.0.5"
 serde = "1.0.15"
 serde_derive = "1.0.15"
