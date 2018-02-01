@@ -155,7 +155,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
     pub fn get(&self, key: &[u8]) -> BFieldLookup {
         let k = u32::from(self.params.n_marker_bits);
-        let putative_marker = self.get_raw(key);
+        let putative_marker = self.get_raw(key, k);
         match putative_marker.count_ones().cmp(&k) {
             Ordering::Greater => BFieldLookup::Indeterminate,
             Ordering::Equal => BFieldLookup::Some(from_marker(putative_marker)),
@@ -164,7 +164,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     }
 
     #[inline]
-    fn get_raw(&self, key: &[u8]) -> BitVecSlice {
+    fn get_raw(&self, key: &[u8], k: u32) -> BitVecSlice {
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
 
@@ -173,6 +173,9 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
             let marker = self.bitvec.get_range(pos..pos + marker_width);
             merged_marker &= marker;
+            if merged_marker.count_ones().cmp(&k) == Ordering::Less {
+                return 0;
+            }
         }
         align_bits(merged_marker, marker_width)
     }
