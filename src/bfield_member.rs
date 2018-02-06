@@ -2,10 +2,12 @@ use std::cmp::Ordering;
 #[cfg(feature = "legacy")]
 use std::fs::File;
 use std::io;
+use std::ops::Range;
 use std::path::Path;
 
 use bincode::{serialize, deserialize, Infinite};
 use mmap_bitvec::{BitVector, MmapBitVec, BitVecSlice};
+use mmap_bitvec::bitvec::BIT_VEC_SLICE_SIZE;
 use murmurhash3::murmurhash3_x64_128;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -171,7 +173,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         let mut merged_marker = BitVecSlice::max_value();
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
-            let marker = self.bitvec.get_range(pos..pos + marker_width);
+            let marker = get_range(&self.bitvec, pos..pos + marker_width);
             merged_marker &= marker;
             if merged_marker.count_ones().cmp(&k) == Ordering::Less {
                 return 0;
@@ -222,6 +224,50 @@ fn marker_pos(hash: (u64, u64), n: usize, total_size: usize, _: usize) -> usize 
         .0;
     // note that the nim implementation always uses a marker width of 64 here
     i64::abs(mashed_hash % (total_size as i64 - 64)) as usize
+}
+
+/// This is totally messed up, but we get a speed bump by doing this
+/// instead of using the _exact same_ function on the struct.
+#[cfg(not(feature = "legacy"))]
+fn get_range(bitvec: &MmapBitVec, r: Range<usize>) -> BitVecSlice {
+    if r.end - r.start > BIT_VEC_SLICE_SIZE as usize {
+        panic!(format!("Range too large (>{})", BIT_VEC_SLICE_SIZE))
+    } else if r.end > bitvec.size {
+        panic!("Range ends outside of BitVec")
+    }
+    let byte_idx_st = (r.start >> 3) as usize;
+    let byte_idx_en = ((r.end - 1) >> 3) as usize;
+    let new_size: u8 = (r.end - r.start) as u8;
+
+    let mut v;
+    let ptr: *const u8 = bitvec.mmap.as_ptr();
+
+    // read the last byte first
+    unsafe {
+        v = BitVecSlice::from(*ptr.offset(byte_idx_en as isize));
+    }
+    // align the end of the data with the end of the u64/u128
+    v >>= 7 - ((r.end - 1) & 7);
+
+    let bit_offset = new_size + (r.start & 7) as u8;
+    // copy over byte by byte
+    // it would be faster to coerce into a u8 and a u64 (in case it spans 9 bytes) and then
+    // copy over, but this doesn't work if the start is <8 bytes from the end, so we're doing
+    // this for now and we can add a special case for that later
+    for (new_idx, old_idx) in (byte_idx_st..byte_idx_en).enumerate() {
+        unsafe {
+            v |= BitVecSlice::from(*ptr.offset(old_idx as isize)) <<
+                (bit_offset - 8u8 * (new_idx as u8 + 1));
+        }
+    }
+
+    // mask out the high bits in case we copied extra
+    v & BitVecSlice::max_value() >> (BIT_VEC_SLICE_SIZE - new_size)
+}
+
+#[cfg(feature = "legacy")]
+fn get_range(bitvec: &MmapBitVec, r: Range<usize>) -> BitVecSlice {
+    bitvec.get_range(r)
 }
 
 #[test]
