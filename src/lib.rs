@@ -1,4 +1,5 @@
 #![cfg_attr(feature = "marker_lookup", feature(const_fn))]
+#![cfg_attr(feature = "prefetching", feature(core_intrinsics))]
 extern crate bincode;
 extern crate mmap_bitvec;
 extern crate murmurhash3;

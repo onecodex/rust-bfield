@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 #[cfg(feature = "legacy")]
 use std::fs::File;
+#[cfg(feature = "prefetching")]
+use std::intrinsics;
 use std::io;
 use std::ops::Range;
 use std::path::Path;
@@ -155,6 +157,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         }
     }
 
+    #[inline]
     pub fn get(&self, key: &[u8]) -> BFieldLookup {
         let k = u32::from(self.params.n_marker_bits);
         let putative_marker = self.get_raw(key, k);
@@ -169,13 +172,29 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     fn get_raw(&self, key: &[u8], k: u32) -> BitVecSlice {
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
-
         let mut merged_marker = BitVecSlice::max_value();
+        let mut positions: [usize; 16] = [0; 16];  // support up to 16 hashes
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
-            let marker = get_range(&self.bitvec, pos..pos + marker_width);
+            positions[marker_ix] = pos;
+
+            // pre-fetch the memory!
+            if cfg!(feature = "prefetching") {
+                unsafe {
+                    let byte_idx_st = (pos >> 3) as usize;
+                    let ptr: *const u8 = self.bitvec.mmap.as_ptr().offset(byte_idx_st as isize);
+                    #[cfg(feature = "prefetching")]
+                    intrinsics::prefetch_read_data(ptr, 3);
+                }
+            }
+        }
+
+        assert!(self.params.n_hashes <= 16);
+        for marker_ix in 0usize..self.params.n_hashes as usize {
+            let pos = positions[marker_ix];
+            let marker =  self.bitvec.get_range(pos..pos + marker_width);
             merged_marker &= marker;
-            if merged_marker.count_ones().cmp(&k) == Ordering::Less {
+            if merged_marker.count_ones() < k {
                 return 0;
             }
         }
@@ -224,50 +243,6 @@ fn marker_pos(hash: (u64, u64), n: usize, total_size: usize, _: usize) -> usize 
         .0;
     // note that the nim implementation always uses a marker width of 64 here
     i64::abs(mashed_hash % (total_size as i64 - 64)) as usize
-}
-
-/// This is totally messed up, but we get a speed bump by doing this
-/// instead of using the _exact same_ function on the struct.
-#[cfg(not(feature = "legacy"))]
-fn get_range(bitvec: &MmapBitVec, r: Range<usize>) -> BitVecSlice {
-    if r.end - r.start > BIT_VEC_SLICE_SIZE as usize {
-        panic!(format!("Range too large (>{})", BIT_VEC_SLICE_SIZE))
-    } else if r.end > bitvec.size {
-        panic!("Range ends outside of BitVec")
-    }
-    let byte_idx_st = (r.start >> 3) as usize;
-    let byte_idx_en = ((r.end - 1) >> 3) as usize;
-    let new_size: u8 = (r.end - r.start) as u8;
-
-    let mut v;
-    let ptr: *const u8 = bitvec.mmap.as_ptr();
-
-    // read the last byte first
-    unsafe {
-        v = BitVecSlice::from(*ptr.offset(byte_idx_en as isize));
-    }
-    // align the end of the data with the end of the u64/u128
-    v >>= 7 - ((r.end - 1) & 7);
-
-    let bit_offset = new_size + (r.start & 7) as u8;
-    // copy over byte by byte
-    // it would be faster to coerce into a u8 and a u64 (in case it spans 9 bytes) and then
-    // copy over, but this doesn't work if the start is <8 bytes from the end, so we're doing
-    // this for now and we can add a special case for that later
-    for (new_idx, old_idx) in (byte_idx_st..byte_idx_en).enumerate() {
-        unsafe {
-            v |= BitVecSlice::from(*ptr.offset(old_idx as isize)) <<
-                (bit_offset - 8u8 * (new_idx as u8 + 1));
-        }
-    }
-
-    // mask out the high bits in case we copied extra
-    v & BitVecSlice::max_value() >> (BIT_VEC_SLICE_SIZE - new_size)
-}
-
-#[cfg(feature = "legacy")]
-fn get_range(bitvec: &MmapBitVec, r: Range<usize>) -> BitVecSlice {
-    bitvec.get_range(r)
 }
 
 #[test]
