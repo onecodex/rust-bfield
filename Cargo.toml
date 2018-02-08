@@ -1,6 +1,6 @@
 [package]
 name = "bfield"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Roderick Bovee <roderick@onecodex.com>"]
 
 [dependencies]
@@ -13,5 +13,6 @@ serde_json = { version = "1.0.4", optional = true}
 
 [features]
 marker_lookup = []
+prefetching = []
 legacy = ["mmap-bitvec/backward_bytes", "serde_json"]
 wide_markers = ["mmap-bitvec/u128"]
