@@ -160,6 +160,12 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         // or return a Result<Option<BFieldVal>, ...> instead?
         None
     }
+
+    pub fn info(&self) -> Vec<(usize, u8, u8, u8)> {
+        self.members.iter().map(|m| {
+            m.info()
+        }).collect()
+    }
 }
 
 #[cfg(feature = "legacy")]

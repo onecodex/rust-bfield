@@ -200,6 +200,10 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         }
         align_bits(merged_marker, marker_width)
     }
+
+    pub fn info(&self) -> (usize, u8, u8, u8) {
+        (self.bitvec.size(), self.params.n_hashes, self.params.marker_width, self.params.n_marker_bits)
+    }
 }
 
 #[cfg(not(feature = "legacy"))]
