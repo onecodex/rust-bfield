@@ -4,8 +4,8 @@ use std::path::Path;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
-use marker::{to_marker};
+use crate::bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
+use crate::marker::{to_marker};
 
 
 pub struct BField<T> {
@@ -57,7 +57,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         let _ = to_marker(0, n_marker_bits);
 
         Ok(BField {
-            members: members,
+            members,
             read_only: false,
         })
     }
@@ -81,15 +81,15 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
             members.push(member);
             n += 1;
         }
-        if members.len() == 0 {
+        if members.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!("No Bfield found at {:?}", filename.as_ref())
             ));
         }
         Ok(BField {
-            members: members,
-            read_only: read_only,
+            members,
+            read_only,
         })
     }
 
@@ -114,7 +114,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
             n += 1;
         }
         Ok(BField {
-            members: members,
+            members,
             read_only: true,
         })
     }

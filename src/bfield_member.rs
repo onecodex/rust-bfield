@@ -4,19 +4,17 @@ use std::fs::File;
 #[cfg(feature = "prefetching")]
 use std::intrinsics;
 use std::io;
-use std::ops::Range;
 use std::path::Path;
 
 use bincode::{serialize, deserialize, Infinite};
 use mmap_bitvec::{BitVector, MmapBitVec, BitVecSlice};
-use mmap_bitvec::bitvec::BIT_VEC_SLICE_SIZE;
 use murmurhash3::murmurhash3_x64_128;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 #[cfg(feature = "legacy")]
 use serde_json;
 
-use marker::{from_marker, to_marker};
+use crate::marker::{from_marker, to_marker};
 
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -55,9 +53,9 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         P: AsRef<Path>,
     {
         let bf_params = BFieldParams {
-            n_hashes: n_hashes,
-            marker_width: marker_width,
-            n_marker_bits: n_marker_bits,
+            n_hashes,
+            marker_width,
+            n_marker_bits,
             other: other_params,
         };
 
@@ -121,9 +119,9 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         n_marker_bits: u8,
     ) -> Result<Self, io::Error> {
         let bf_params = BFieldParams {
-            n_hashes: n_hashes,
-            marker_width: marker_width,
-            n_marker_bits: n_marker_bits,
+            n_hashes,
+            marker_width,
+            n_marker_bits,
             other: None,
         };
 
@@ -230,9 +228,8 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         }
 
         assert!(self.params.n_hashes <= 16);
-        for marker_ix in 0usize..self.params.n_hashes as usize {
-            let pos = positions[marker_ix];
-            let marker =  self.bitvec.get_range(pos..pos + marker_width);
+        for pos in positions.iter().take(self.params.n_hashes as usize) {
+            let marker =  self.bitvec.get_range(*pos..*pos + marker_width);
             merged_marker &= marker;
             if merged_marker.count_ones() < k {
                 return 0;
@@ -305,8 +302,9 @@ fn test_bfield() {
 
 #[test]
 fn test_bfield_collisions() {
-    // comically small bfield with too many hashes to cause saturation
-    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 100, 16, 4).unwrap();
+    // comically small bfield with too many (16) hashes
+    // and too many bits (8) to cause saturation
+    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 16, 64, 8).unwrap();
 
     bfield.insert(b"test", 100);
     assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
@@ -314,7 +312,6 @@ fn test_bfield_collisions() {
 
 #[test]
 fn test_bfield_bits_set() {
-    // comically small bfield with too many hashes to cause saturation
     let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 2, 16, 4).unwrap();
 
     bfield.insert(b"test", 100);

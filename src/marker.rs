@@ -1,7 +1,8 @@
 #![cfg_attr(feature = "const_fn", feature(marker_lookup))]
 
 use mmap_bitvec::BitVecSlice;
-use bfield_member::BFieldVal;
+
+use crate::bfield_member::BFieldVal;
 
 #[cfg(feature = "marker_lookup")]
 const MARKER_TABLE_SIZE: usize = 200000;
@@ -12,14 +13,22 @@ static mut MARKER_BITS: u8 = 0;
 
 #[cfg(feature = "marker_lookup")]
 pub fn to_marker(value: BFieldVal, k: u8) -> BitVecSlice {
+    // note that you can only test this feature with
+    // `RUST_TEST_THREADS=1 cargo test` or else you'll get tons of
+    // errors because of data races between threads with different k's
+
+    // also some tests (i.e. ones with k=1) fail because there are fewer
+    // than 200000 possible values for the table
     unsafe {
+        // clear out the lookup table if we have a new k and fill
+        // it with values for the new k
         if MARKER_BITS != k {
-            MARKER_BITS = k;
             MARKER_TABLE = [0; MARKER_TABLE_SIZE];
             MARKER_TABLE[0] = (1 << k) - 1 as BitVecSlice;
             for i in 1..MARKER_TABLE_SIZE {
                 MARKER_TABLE[i] = next_marker(MARKER_TABLE[i - 1]);
             }
+            MARKER_BITS = k;
         }
         if value as usize >= MARKER_TABLE_SIZE {
             let mut marker = MARKER_TABLE[MARKER_TABLE_SIZE - 1];
@@ -64,7 +73,7 @@ pub fn from_marker(marker: BitVecSlice) -> BFieldVal {
     let mut value = 0u64;
     let mut idx = 0;
     while working_marker != 0 {
-        let rank = working_marker.trailing_zeros() as u64;
+        let rank = u64::from(working_marker.trailing_zeros());
         working_marker -= 1 << rank;
         idx += 1;
         value += choose(rank, idx);
