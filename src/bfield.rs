@@ -1,12 +1,11 @@
 use std::io;
 use std::path::Path;
 
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
-use crate::marker::{to_marker};
-
+use crate::marker::to_marker;
 
 pub struct BField<T> {
     members: Vec<BFieldMember<T>>,
@@ -19,9 +18,9 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
     pub fn create<P>(
         filename: P,
         size: usize,
-        n_hashes: u8, // k
-        marker_width: u8, // nu
-        n_marker_bits: u8, // kappa
+        n_hashes: u8,             // k
+        marker_width: u8,         // nu
+        n_marker_bits: u8,        // kappa
         secondary_scaledown: f64, // beta
         max_scaledown: f64,
         n_secondaries: u8,
@@ -43,8 +42,14 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
             } else {
                 None
             };
-            let member =
-                BFieldMember::create(file, cur_size, n_hashes, marker_width, n_marker_bits, params)?;
+            let member = BFieldMember::create(
+                file,
+                cur_size,
+                n_hashes,
+                marker_width,
+                n_marker_bits,
+                params,
+            )?;
             members.push(member);
             cur_size = f64::max(
                 cur_size as f64 * secondary_scaledown,
@@ -84,13 +89,10 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         if members.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("No Bfield found at {:?}", filename.as_ref())
+                format!("No Bfield found at {:?}", filename.as_ref()),
             ));
         }
-        Ok(BField {
-            members,
-            read_only,
-        })
+        Ok(BField { members, read_only })
     }
 
     #[cfg(feature = "legacy")]
@@ -178,9 +180,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
     }
 
     pub fn info(&self) -> Vec<(usize, u8, u8, u8)> {
-        self.members.iter().map(|m| {
-            m.info()
-        }).collect()
+        self.members.iter().map(|m| m.info()).collect()
     }
 }
 

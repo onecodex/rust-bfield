@@ -42,7 +42,6 @@ pub fn to_marker(value: BFieldVal, k: u8) -> BitVecSlice {
     }
 }
 
-
 #[cfg(not(feature = "marker_lookup"))]
 pub fn to_marker(value: BFieldVal, k: u8) -> BitVecSlice {
     // set the appropriate number of bits in the marker
@@ -141,7 +140,6 @@ fn next_marker(marker: BitVecSlice) -> BitVecSlice {
     let t = marker | (marker - 1);
     (t + 1) | (((!t & (t + 1)) - 1) >> (marker.trailing_zeros() + 1))
 }
-
 
 #[test]
 fn test_next_marker() {

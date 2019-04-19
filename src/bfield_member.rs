@@ -6,21 +6,20 @@ use std::intrinsics;
 use std::io;
 use std::path::Path;
 
-use bincode::{serialize, deserialize, Infinite};
-use mmap_bitvec::{BitVector, MmapBitVec, BitVecSlice};
+use bincode::{deserialize, serialize, Infinite};
+use mmap_bitvec::{BitVecSlice, BitVector, MmapBitVec};
 use murmurhash3::murmurhash3_x64_128;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 #[cfg(feature = "legacy")]
 use serde_json;
 
 use crate::marker::{from_marker, to_marker};
 
-
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct BFieldParams<T> {
-    n_hashes: u8, // k
-    marker_width: u8, // nu
+    n_hashes: u8,      // k
+    marker_width: u8,  // nu
     n_marker_bits: u8, // kappa
     pub(crate) other: Option<T>,
 }
@@ -148,10 +147,8 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
-            self.bitvec.set_range(
-                pos..pos + marker_width,
-                aligned_marker,
-            );
+            self.bitvec
+                .set_range(pos..pos + marker_width, aligned_marker);
         }
     }
 
@@ -168,7 +165,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         let existing_marker = self.get_raw(key, k);
 
         match existing_marker.count_ones().cmp(&k) {
-            Ordering::Greater => false,  // already indeterminate
+            Ordering::Greater => false, // already indeterminate
             Ordering::Equal => {
                 // value already in b-field, but is it correct?
                 if existing_marker == correct_marker {
@@ -186,12 +183,12 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
                 // mask out the existing!
                 self.insert_raw(key, new_marker);
                 false
-            },
+            }
             Ordering::Less => {
                 // nothing present; insert the value
                 self.insert_raw(key, correct_marker);
                 true
-            },
+            }
         }
     }
 
@@ -211,7 +208,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
         let mut merged_marker = BitVecSlice::max_value();
-        let mut positions: [usize; 16] = [0; 16];  // support up to 16 hashes
+        let mut positions: [usize; 16] = [0; 16]; // support up to 16 hashes
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
             positions[marker_ix] = pos;
@@ -229,7 +226,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
         assert!(self.params.n_hashes <= 16);
         for pos in positions.iter().take(self.params.n_hashes as usize) {
-            let marker =  self.bitvec.get_range(*pos..*pos + marker_width);
+            let marker = self.bitvec.get_range(*pos..*pos + marker_width);
             merged_marker &= marker;
             if merged_marker.count_ones() < k {
                 return 0;
@@ -239,7 +236,12 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     }
 
     pub fn info(&self) -> (usize, u8, u8, u8) {
-        (self.bitvec.size(), self.params.n_hashes, self.params.marker_width, self.params.n_marker_bits)
+        (
+            self.bitvec.size(),
+            self.params.n_hashes,
+            self.params.marker_width,
+            self.params.n_marker_bits,
+        )
     }
 }
 
@@ -319,7 +321,7 @@ fn test_bfield_bits_set() {
     bfield.insert(b"test2", 200);
     assert_eq!(bfield.bitvec.rank(0..128), 16);
     bfield.insert(b"test3", 300);
-    assert!(bfield.bitvec.rank(0..128) < 24);  // 23 bits set
+    assert!(bfield.bitvec.rank(0..128) < 24); // 23 bits set
 }
 
 #[test]
