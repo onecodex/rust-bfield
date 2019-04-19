@@ -121,6 +121,12 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         })
     }
 
+    pub fn build_params(&self) -> (u8, u8, u8, Vec<usize>) {
+        let (_, n_hashes, marker_width, n_marker_bits) = self.members[0].info();
+        let sizes = self.members.iter().map(|i| i.info().0).collect();
+        (n_hashes, marker_width, n_marker_bits, sizes)
+    }
+
     pub fn params(&self) -> &Option<T> {
         &self.members[0].params.other
     }

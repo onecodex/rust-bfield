@@ -101,7 +101,7 @@ fn test_to_and_from_marker() {
 /// This may overflow for k > 9 (with n = 128), but hopefully
 /// that doesn't happen
 #[inline]
-fn choose(n: u64, k: u8) -> u64 {
+pub fn choose(n: u64, k: u8) -> u64 {
     match k {
         1 => n,
         2 => n * (n - 1) / 2,
