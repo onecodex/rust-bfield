@@ -157,6 +157,46 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         }
     }
 
+    /// "Removes" a key from the b-field by flipping an extra bit to make it
+    /// indeterminate. Use this with caution because it can make other keys
+    /// indeterminate by saturating the b-field with ones.
+    ///
+    /// Returns `true` if the value was inserted or was already present with
+    /// the correct value; `false` if masking occured or if it was already
+    /// indeterminate.
+    pub fn mask_or_insert(&mut self, key: &[u8], value: BFieldVal) -> bool {
+        let correct_marker = to_marker(value, self.params.n_marker_bits);
+        let k = u32::from(self.params.n_marker_bits);
+        let existing_marker = self.get_raw(key, k);
+
+        match existing_marker.count_ones().cmp(&k) {
+            Ordering::Greater => false,  // already indeterminate
+            Ordering::Equal => {
+                // value already in b-field, but is it correct?
+                if existing_marker == correct_marker {
+                    return true;
+                }
+                // try to find a new, invalid marker that has an extra
+                // bit over the existing marker so that it'll become
+                // indeterminate once we overwrite it
+                let mut pos = 0;
+                let mut new_marker = existing_marker;
+                while new_marker.count_ones() == k {
+                    new_marker = existing_marker | (1 << pos);
+                    pos += 1;
+                }
+                // mask out the existing!
+                self.insert_raw(key, new_marker);
+                false
+            },
+            Ordering::Less => {
+                // nothing present; insert the value
+                self.insert_raw(key, correct_marker);
+                true
+            },
+        }
+    }
+
     #[inline]
     pub fn get(&self, key: &[u8]) -> BFieldLookup {
         let k = u32::from(self.params.n_marker_bits);
@@ -283,4 +323,28 @@ fn test_bfield_bits_set() {
     assert_eq!(bfield.bitvec.rank(0..128), 16);
     bfield.insert(b"test3", 300);
     assert!(bfield.bitvec.rank(0..128) < 24);  // 23 bits set
+}
+
+#[test]
+fn test_bfield_mask_or_insert() {
+    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(1024, 2, 16, 4).unwrap();
+
+    bfield.insert(b"test", 2);
+    assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
+
+    // `mask_or_insert`ing the same value doesn't change anything
+    assert_eq!(bfield.mask_or_insert(b"test", 2), true);
+    assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
+
+    // `mask_or_insert`ing a new value results in an indeterminate
+    assert_eq!(bfield.mask_or_insert(b"test", 3), false);
+    assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
+
+    // `mask_or_insert`ing an indeterminate value is still indeterminate
+    assert_eq!(bfield.mask_or_insert(b"test", 3), false);
+    assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
+
+    // `mask_or_insert`ing a new key just sets that key
+    assert_eq!(bfield.mask_or_insert(b"test2", 2), true);
+    assert_eq!(bfield.get(b"test2"), BFieldLookup::Some(2));
 }

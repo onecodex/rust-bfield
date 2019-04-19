@@ -130,6 +130,22 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         self.members[0].params.other = Some(params);
     }
 
+    /// This allows an insert of a value into the b-field after the entire
+    /// b-field build process has been completed.
+    ///
+    /// It has the very bad downside of potentially knocking other keys out
+    /// of the b-field by making them indeterminate (which will make them fall
+    /// back to the secondaries where they don't exist and thus it'll appear
+    /// as if they were never inserted to begin with)
+    pub fn force_insert(&mut self, key: &[u8], value: BFieldVal) {
+        debug_assert!(!self.read_only, "Can't insert into read_only bfields");
+        for secondary in self.members.iter_mut() {
+            if secondary.mask_or_insert(&key, value) {
+                break;
+            }
+        }
+    }
+
     pub fn insert(&mut self, key: &[u8], value: BFieldVal, pass: usize) -> bool {
         debug_assert!(!self.read_only, "Can't insert into read_only bfields");
         debug_assert!(
