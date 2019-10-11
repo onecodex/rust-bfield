@@ -1,11 +1,11 @@
 use std::io;
 use std::path::Path;
 
+use mmap_bitvec::combinatorial::rank;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
-use crate::marker::to_marker;
 
 pub struct BField<T> {
     members: Vec<BFieldMember<T>>,
@@ -59,7 +59,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
 
         // Initialize our marker table, so we don't
         // have any race conditions across threads
-        let _ = to_marker(0, n_marker_bits);
+        let _ = rank(0, n_marker_bits);
 
         Ok(BField {
             members,

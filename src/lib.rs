@@ -6,8 +6,7 @@ extern crate serde_derive;
 
 mod bfield;
 mod bfield_member;
-mod marker;
 
-pub use crate::marker::choose;
 pub use crate::bfield::BField;
 pub use crate::bfield_member::BFieldVal;
+pub use mmap_bitvec::combinatorial::choose;

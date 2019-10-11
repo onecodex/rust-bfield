@@ -7,14 +7,13 @@ use std::io;
 use std::path::Path;
 
 use bincode::{deserialize, serialize, Infinite};
-use mmap_bitvec::{BitVecSlice, BitVector, MmapBitVec};
+use mmap_bitvec::combinatorial::{rank, unrank};
+use mmap_bitvec::{BitVector, MmapBitVec};
 use murmurhash3::murmurhash3_x64_128;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 #[cfg(feature = "legacy")]
 use serde_json;
-
-use crate::marker::{from_marker, to_marker};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct BFieldParams<T> {
@@ -59,7 +58,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         };
 
         let header: Vec<u8> = serialize(&bf_params, Infinite).unwrap();
-        let bv = MmapBitVec::create(filename, size, &BF_MAGIC, &header)?;
+        let bv = MmapBitVec::create(filename, size, BF_MAGIC, &header)?;
 
         Ok(BFieldMember {
             bitvec: bv,
@@ -136,11 +135,11 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         // TODO: need to do a check that `value` < allowable range based on
         // self.params.marker_width and self.params.n_marker_bits
         let k = self.params.n_marker_bits;
-        self.insert_raw(key, to_marker(value, k));
+        self.insert_raw(key, rank(value as usize, k));
     }
 
     #[inline]
-    fn insert_raw(&mut self, key: &[u8], marker: BitVecSlice) {
+    fn insert_raw(&mut self, key: &[u8], marker: u128) {
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
         let aligned_marker = align_bits(marker, marker_width);
@@ -160,7 +159,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     /// the correct value; `false` if masking occured or if it was already
     /// indeterminate.
     pub fn mask_or_insert(&mut self, key: &[u8], value: BFieldVal) -> bool {
-        let correct_marker = to_marker(value, self.params.n_marker_bits);
+        let correct_marker = rank(value as usize, self.params.n_marker_bits);
         let k = u32::from(self.params.n_marker_bits);
         let existing_marker = self.get_raw(key, k);
 
@@ -198,16 +197,16 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         let putative_marker = self.get_raw(key, k);
         match putative_marker.count_ones().cmp(&k) {
             Ordering::Greater => BFieldLookup::Indeterminate,
-            Ordering::Equal => BFieldLookup::Some(from_marker(putative_marker)),
+            Ordering::Equal => BFieldLookup::Some(unrank(putative_marker) as u32),
             Ordering::Less => BFieldLookup::None,
         }
     }
 
     #[inline]
-    fn get_raw(&self, key: &[u8], k: u32) -> BitVecSlice {
+    fn get_raw(&self, key: &[u8], k: u32) -> u128 {
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
-        let mut merged_marker = BitVecSlice::max_value();
+        let mut merged_marker = u128::max_value();
         let mut positions: [usize; 16] = [0; 16]; // support up to 16 hashes
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
@@ -217,7 +216,8 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             if cfg!(feature = "prefetching") {
                 unsafe {
                     let byte_idx_st = (pos >> 3) as usize;
-                    let ptr: *const u8 = self.bitvec.mmap.as_ptr().offset(byte_idx_st as isize);
+                    #[allow(unused_variables)]
+                    let ptr: *const u8 = self.bitvec.mmap.as_ptr().add(byte_idx_st);
                     #[cfg(feature = "prefetching")]
                     intrinsics::prefetch_read_data(ptr, 3);
                 }
@@ -247,17 +247,17 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
 #[cfg(not(feature = "legacy"))]
 #[inline]
-fn align_bits(b: BitVecSlice, _: usize) -> BitVecSlice {
+fn align_bits(b: u128, _: usize) -> u128 {
     // everything is normal if we're not in legacy mode (this is a noop)
     b
 }
 
 #[cfg(feature = "legacy")]
 #[inline]
-fn align_bits(b: BitVecSlice, len: usize) -> BitVecSlice {
+fn align_bits(b: u128, len: usize) -> u128 {
     // we need to reverse the bits (everything is backwards at both the byte
     // and the marker level in the existing nim implementation)
-    let mut new_b = 0 as BitVecSlice;
+    let mut new_b = 0u128;
     for i in 0..len {
         new_b |= (b & (1 << (len - i - 1))) >> (len - i - 1) << i;
     }
