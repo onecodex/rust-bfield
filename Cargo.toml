@@ -5,7 +5,7 @@ authors = ["Roderick Bovee <roderick@onecodex.com>"]
 edition = "2018"
 
 [dependencies]
-bincode = "0.9.2"
+bincode = "1"
 mmap-bitvec = { git="ssh://git@github.com/onecodex/mmap-bitvec.git", tag="v0.3.0" }
 murmurhash3 = "0.0.5"
 serde = "1.0.15"

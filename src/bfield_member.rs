@@ -4,7 +4,7 @@ use std::intrinsics;
 use std::io;
 use std::path::Path;
 
-use bincode::{deserialize, serialize, Infinite};
+use bincode::{deserialize, serialize};
 use mmap_bitvec::combinatorial::{rank, unrank};
 use mmap_bitvec::{BitVector, MmapBitVec};
 use murmurhash3::murmurhash3_x64_128;
@@ -53,7 +53,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             other: other_params,
         };
 
-        let header: Vec<u8> = serialize(&bf_params, Infinite).unwrap();
+        let header: Vec<u8> = serialize(&bf_params).unwrap();
         let bv = MmapBitVec::create(filename, size, BF_MAGIC, &header)?;
 
         Ok(BFieldMember {
