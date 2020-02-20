@@ -15,4 +15,3 @@ serde_json = { version = "1.0.4", optional = true}
 [features]
 marker_lookup = ["mmap-bitvec/rank_lookup"]
 prefetching = []
-legacy = ["mmap-bitvec/backward_bytes", "serde_json"]
