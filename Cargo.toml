@@ -10,7 +10,6 @@ mmap-bitvec = { git="ssh://git@github.com/onecodex/mmap-bitvec.git", tag="v0.3.0
 murmurhash3 = "0.0.5"
 serde = "1.0.15"
 serde_derive = "1.0.15"
-serde_json = { version = "1.0.4", optional = true}
 
 [features]
 marker_lookup = ["mmap-bitvec/rank_lookup"]
