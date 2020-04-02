@@ -1,4 +1,3 @@
-#![cfg_attr(feature = "marker_lookup", feature(const_fn))]
 #![cfg_attr(feature = "prefetching", feature(core_intrinsics))]
 
 #[macro_use]

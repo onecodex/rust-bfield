@@ -1,0 +1,57 @@
+name: ci
+on: [push, pull_request]
+
+# https://stackoverflow.com/questions/57612428/cloning-private-github-repository-within-organisation-in-actions
+# I created a token with private repo access in my account that I set in the rust-bfield repo vault
+jobs:
+  test:
+    name: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [pinned, stable]
+        include:
+        - build: pinned
+          os: ubuntu-18.04
+          rust: 1.40.0
+        - build: stable
+          os: ubuntu-18.04
+          rust: stable
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Rust
+      uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: ${{ matrix.rust }}
+    - name: Build System Info
+      run: rustc --version
+    - name: Run tests
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: cargo test
+
+  test_with_features:
+    name: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [pinned, stable]
+        include:
+        - build: pinned
+          os: ubuntu-18.04
+          rust: 1.40.0
+        - build: stable
+          os: ubuntu-18.04
+          rust: stable
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Rust
+      uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: ${{ matrix.rust }}
+    - name: Build System Info
+      run: rustc --version
+    - name: Run tests
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: RUST_TEST_THREADS=1 cargo test --features marker_lookup

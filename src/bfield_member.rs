@@ -78,6 +78,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         })
     }
 
+    #[cfg(test)]
     pub fn in_memory(
         size: usize,
         n_hashes: u8,
@@ -113,8 +114,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
-            self.bitvec
-                .set_range(pos..pos + marker_width, marker);
+            self.bitvec.set_range(pos..pos + marker_width, marker);
         }
     }
 
@@ -217,62 +217,67 @@ fn marker_pos(hash: (u64, u64), n: usize, total_size: usize, marker_size: usize)
     ((hash.0 as usize).wrapping_add(n.wrapping_mul(hash.1 as usize))) % (total_size - marker_size)
 }
 
-#[test]
-fn test_bfield() {
-    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(1024, 3, 64, 4).unwrap();
-    // check that inserting keys adds new entries
-    bfield.insert(b"test", 2);
-    assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    bfield.insert(b"test2", 106);
-    assert_eq!(bfield.get(b"test2"), BFieldLookup::Some(106));
+    #[test]
+    fn test_bfield() {
+        let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(1024, 3, 64, 4).unwrap();
+        // check that inserting keys adds new entries
+        bfield.insert(b"test", 2);
+        assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
 
-    // test3 was never added
-    assert_eq!(bfield.get(b"test3"), BFieldLookup::None);
-}
+        bfield.insert(b"test2", 106);
+        assert_eq!(bfield.get(b"test2"), BFieldLookup::Some(106));
 
-#[test]
-fn test_bfield_collisions() {
-    // comically small bfield with too many (16) hashes
-    // and too many bits (8) to cause saturation
-    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 16, 64, 8).unwrap();
+        // test3 was never added
+        assert_eq!(bfield.get(b"test3"), BFieldLookup::None);
+    }
 
-    bfield.insert(b"test", 100);
-    assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
-}
+    #[test]
+    fn test_bfield_collisions() {
+        // comically small bfield with too many (16) hashes
+        // and too many bits (8) to cause saturation
+        let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 16, 64, 8).unwrap();
 
-#[test]
-fn test_bfield_bits_set() {
-    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 2, 16, 4).unwrap();
+        bfield.insert(b"test", 100);
+        assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
+    }
 
-    bfield.insert(b"test", 100);
-    assert_eq!(bfield.bitvec.rank(0..128), 8);
-    bfield.insert(b"test2", 200);
-    assert_eq!(bfield.bitvec.rank(0..128), 16);
-    bfield.insert(b"test3", 300);
-    assert!(bfield.bitvec.rank(0..128) < 24); // 23 bits set
-}
+    #[test]
+    fn test_bfield_bits_set() {
+        let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 2, 16, 4).unwrap();
 
-#[test]
-fn test_bfield_mask_or_insert() {
-    let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(1024, 2, 16, 4).unwrap();
+        bfield.insert(b"test", 100);
+        assert_eq!(bfield.bitvec.rank(0..128), 8);
+        bfield.insert(b"test2", 200);
+        assert_eq!(bfield.bitvec.rank(0..128), 16);
+        bfield.insert(b"test3", 300);
+        assert!(bfield.bitvec.rank(0..128) < 24); // 23 bits set
+    }
 
-    bfield.insert(b"test", 2);
-    assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
+    #[test]
+    fn test_bfield_mask_or_insert() {
+        let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(1024, 2, 16, 4).unwrap();
 
-    // `mask_or_insert`ing the same value doesn't change anything
-    assert_eq!(bfield.mask_or_insert(b"test", 2), true);
-    assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
+        bfield.insert(b"test", 2);
+        assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
 
-    // `mask_or_insert`ing a new value results in an indeterminate
-    assert_eq!(bfield.mask_or_insert(b"test", 3), false);
-    assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
+        // `mask_or_insert`ing the same value doesn't change anything
+        assert_eq!(bfield.mask_or_insert(b"test", 2), true);
+        assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
 
-    // `mask_or_insert`ing an indeterminate value is still indeterminate
-    assert_eq!(bfield.mask_or_insert(b"test", 3), false);
-    assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
+        // `mask_or_insert`ing a new value results in an indeterminate
+        assert_eq!(bfield.mask_or_insert(b"test", 3), false);
+        assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
 
-    // `mask_or_insert`ing a new key just sets that key
-    assert_eq!(bfield.mask_or_insert(b"test2", 2), true);
-    assert_eq!(bfield.get(b"test2"), BFieldLookup::Some(2));
+        // `mask_or_insert`ing an indeterminate value is still indeterminate
+        assert_eq!(bfield.mask_or_insert(b"test", 3), false);
+        assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
+
+        // `mask_or_insert`ing a new key just sets that key
+        assert_eq!(bfield.mask_or_insert(b"test2", 2), true);
+        assert_eq!(bfield.get(b"test2"), BFieldLookup::Some(2));
+    }
 }
