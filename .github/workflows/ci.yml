@@ -1,5 +1,9 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
 
 # https://stackoverflow.com/questions/57612428/cloning-private-github-repository-within-organisation-in-actions
 # I created a token with private repo access in my account that I set in the rust-bfield repo vault
@@ -25,6 +29,10 @@ jobs:
         rust-version: ${{ matrix.rust }}
     - name: Build System Info
       run: rustc --version
+    - name: create SSH key
+      uses: webfactory/ssh-agent@v0.2.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
     - name: Run tests
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
