@@ -13,8 +13,7 @@ pub struct BField<T> {
 }
 
 impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
-    // the hashing is different, so we don't want to accidentally create file in legacy mode
-    #[cfg(not(feature = "legacy"))]
+    #[allow(clippy::too_many_arguments)]
     pub fn create<P>(
         filename: P,
         size: usize,
@@ -67,7 +66,6 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         })
     }
 
-    #[cfg(not(feature = "legacy"))]
     pub fn from_file<P>(filename: P, read_only: bool) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
@@ -93,32 +91,6 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
             ));
         }
         Ok(BField { members, read_only })
-    }
-
-    #[cfg(feature = "legacy")]
-    pub fn from_file<P>(filename: P, _: bool) -> Result<Self, io::Error>
-    where
-        P: AsRef<Path>,
-    {
-        let first_member = BFieldMember::open_legacy(&filename)?;
-        let mut members = vec![first_member];
-        let mut n = 1;
-        loop {
-            let member_filename = Path::with_extension(
-                Path::file_stem(filename.as_ref()).unwrap().as_ref(),
-                format!("mmap.secondary.{:03}", n),
-            );
-            if !member_filename.exists() {
-                break;
-            }
-            let member = BFieldMember::open_legacy(&member_filename)?;
-            members.push(member);
-            n += 1;
-        }
-        Ok(BField {
-            members,
-            read_only: true,
-        })
     }
 
     pub fn build_params(&self) -> (u8, u8, u8, Vec<usize>) {
@@ -188,13 +160,4 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
     pub fn info(&self) -> Vec<(usize, u8, u8, u8)> {
         self.members.iter().map(|m| m.info()).collect()
     }
-}
-
-#[cfg(feature = "legacy")]
-#[test]
-fn test_legacy() {
-    let bf: BField<usize> = BField::from_file("./test_data/legacy/test_bfield.mmap", true).unwrap();
-    assert_eq!(bf.get(b"Hello"), Some(0));
-    assert_eq!(bf.get(b"Not here."), None);
-    assert_eq!(bf.get(b"Hello again"), Some(0));
 }
