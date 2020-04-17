@@ -1,65 +1,97 @@
-name: ci
+name: CI
 on:
   push:
     branches:
       - master
   pull_request:
 
-# https://stackoverflow.com/questions/57612428/cloning-private-github-repository-within-organisation-in-actions
-# I created a token with private repo access in my account that I set in the rust-bfield repo vault
 jobs:
-  test:
-    name: test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        build: [pinned, stable]
-        include:
-        - build: pinned
-          os: ubuntu-18.04
-          rust: 1.40.0
-        - build: stable
-          os: ubuntu-18.04
-          rust: stable
+  tests:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - name: Install Rust
-      uses: hecrj/setup-rust-action@v1
-      with:
-        rust-version: ${{ matrix.rust }}
-    - name: Build System Info
-      run: rustc --version
-    - name: create SSH key
-      uses: webfactory/ssh-agent@v0.2.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-    - name: Run tests
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: cargo test
+      - name: Checkout
+        uses: actions/checkout@master
 
-  test_with_features:
-    name: test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        build: [pinned, stable]
-        include:
-        - build: pinned
-          os: ubuntu-18.04
-          rust: 1.40.0
-        - build: stable
-          os: ubuntu-18.04
-          rust: stable
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: 1.40.0
+          override: true
+
+      - name: create SSH key
+        uses: webfactory/ssh-agent@v0.2.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: version info
+        run:  rustc --version; cargo --version;
+
+      - name: Run all tests
+        run: cargo test
+
+  tests-prefetching:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - name: Install Rust
-      uses: hecrj/setup-rust-action@v1
-      with:
-        rust-version: ${{ matrix.rust }}
-    - name: Build System Info
-      run: rustc --version
-    - name: Run tests
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: RUST_TEST_THREADS=1 cargo test --features marker_lookup
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+
+      - name: create SSH key
+        uses: webfactory/ssh-agent@v0.2.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: version info
+        run:  rustc --version; cargo --version;
+
+      - name: Run all tests
+        run: cargo test --all-features
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: create SSH key
+        uses: webfactory/ssh-agent@v0.2.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: create SSH key
+        uses: webfactory/ssh-agent@v0.2.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args:  -- -D warnings

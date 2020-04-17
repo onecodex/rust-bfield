@@ -175,6 +175,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         let hash = murmurhash3_x64_128(key, 0);
         let mut merged_marker = u128::max_value();
         let mut positions: [usize; 16] = [0; 16]; // support up to 16 hashes
+        #[allow(clippy::needless_range_loop)]
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
             positions[marker_ix] = pos;

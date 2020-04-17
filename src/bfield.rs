@@ -13,6 +13,7 @@ pub struct BField<T> {
 }
 
 impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
+    #[allow(clippy::too_many_arguments)]
     pub fn create<P>(
         filename: P,
         size: usize,
