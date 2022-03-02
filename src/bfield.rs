@@ -32,10 +32,10 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         let mut members = Vec::new();
         for n in 0..n_secondaries {
             // panics if filename == ''
-            let file = Path::with_extension(
+            let file = filename.as_ref().with_file_name(Path::with_extension(
                 Path::file_stem(filename.as_ref()).unwrap().as_ref(),
                 format!("{}.bfd", n),
-            );
+            ));
             let params = if n == 0 {
                 Some(other_params.clone())
             } else {
