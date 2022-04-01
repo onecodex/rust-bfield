@@ -9,7 +9,28 @@ use mmap_bitvec::combinatorial::{rank, unrank};
 use mmap_bitvec::{BitVector, MmapBitVec};
 use murmurhash3::murmurhash3_x64_128;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+
+// Empty function on some archs
+#[allow(unused_variables)]
+#[inline]
+fn prefetch_read(pointer: *const u8) {
+    #[cfg(all(target_arch = "x86_64", target_feature = "sse"))]
+    {
+        use std::arch::x86_64 as arch_impl;
+
+        unsafe {
+            arch_impl::_mm_prefetch::<{ arch_impl::_MM_HINT_NTA }>(
+                pointer as *const i8
+            );
+        }
+
+        return;
+    }
+
+}
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct BFieldParams<T> {
@@ -69,7 +90,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         let bv = MmapBitVec::open(filename, Some(&BF_MAGIC), read_only)?;
         let bf_params: BFieldParams<T> = {
             let header = bv.header();
-            deserialize(&header[..]).unwrap()
+            deserialize(header).unwrap()
         };
 
         Ok(BFieldMember {
@@ -173,12 +194,18 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     fn get_raw(&self, key: &[u8], k: u32) -> u128 {
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
-        let mut merged_marker = u128::max_value();
+        let mut merged_marker = u128::MAX;
         let mut positions: [usize; 16] = [0; 16]; // support up to 16 hashes
         #[allow(clippy::needless_range_loop)]
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
             positions[marker_ix] = pos;
+            // TODO: benchmark me
+            // unsafe {
+            //     let byte_idx_st = (pos >> 3) as usize;
+            //     let ptr: *const u8 = self.bitvec.mmap.as_ptr().add(byte_idx_st);
+            //     prefetch_read(ptr);
+            // }
 
             // pre-fetch the memory!
             if cfg!(feature = "prefetching") {

@@ -1,8 +1,5 @@
 #![cfg_attr(feature = "prefetching", feature(core_intrinsics))]
 
-#[macro_use]
-extern crate serde_derive;
-
 mod bfield;
 mod bfield_member;
 

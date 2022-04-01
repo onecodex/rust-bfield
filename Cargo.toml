@@ -8,8 +8,14 @@ edition = "2018"
 bincode = "1"
 mmap-bitvec = { git="ssh://git@github.com/onecodex/mmap-bitvec.git", tag="v0.3.1" }
 murmurhash3 = "0.0.5"
-serde = "1.0.15"
-serde_derive = "1.0.15"
+serde = { version = "1.0", features = ["derive"] }
 
 [features]
 prefetching = []
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "benchmark"
+harness = false

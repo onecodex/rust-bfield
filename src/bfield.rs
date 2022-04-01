@@ -12,7 +12,7 @@ pub struct BField<T> {
     read_only: bool,
 }
 
-impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
+impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
     #[allow(clippy::too_many_arguments)]
     pub fn create<P>(
         filename: P,
@@ -120,7 +120,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
     pub fn force_insert(&mut self, key: &[u8], value: BFieldVal) {
         debug_assert!(!self.read_only, "Can't insert into read_only bfields");
         for secondary in self.members.iter_mut() {
-            if secondary.mask_or_insert(&key, value) {
+            if secondary.mask_or_insert(key, value) {
                 break;
             }
         }
@@ -134,19 +134,19 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         );
         if pass > 0 {
             for secondary in self.members[..pass].iter() {
-                match secondary.get(&key) {
+                match secondary.get(key) {
                     BFieldLookup::Indeterminate => continue,
                     _ => return false,
                 }
             }
         }
-        self.members[pass].insert(&key, value);
+        self.members[pass].insert(key, value);
         true
     }
 
     pub fn get(&self, key: &[u8]) -> Option<BFieldVal> {
         for secondary in self.members.iter() {
-            match secondary.get(&key) {
+            match secondary.get(key) {
                 BFieldLookup::Indeterminate => continue,
                 BFieldLookup::Some(value) => return Some(value),
                 BFieldLookup::None => return None,
