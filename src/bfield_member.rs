@@ -11,7 +11,6 @@ use murmurhash3::murmurhash3_x64_128;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-
 // Empty function on some archs
 #[allow(unused_variables)]
 #[inline]
@@ -21,16 +20,12 @@ fn prefetch_read(pointer: *const u8) {
         use std::arch::x86_64 as arch_impl;
 
         unsafe {
-            arch_impl::_mm_prefetch::<{ arch_impl::_MM_HINT_NTA }>(
-                pointer as *const i8
-            );
+            arch_impl::_mm_prefetch::<{ arch_impl::_MM_HINT_NTA }>(pointer as *const i8);
         }
 
         return;
     }
-
 }
-
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct BFieldParams<T> {

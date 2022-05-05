@@ -15,7 +15,8 @@ pub struct BField<T> {
 impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
     #[allow(clippy::too_many_arguments)]
     pub fn create<P>(
-        filename: P,
+        directory: P,
+        filename: &str,
         size: usize,
         n_hashes: u8,             // k
         marker_width: u8,         // nu
@@ -28,14 +29,12 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
     where
         P: AsRef<Path>,
     {
+        debug_assert!(!filename.is_empty());
         let mut cur_size = size;
         let mut members = Vec::new();
+
         for n in 0..n_secondaries {
-            // panics if filename == ''
-            let file = filename.as_ref().with_file_name(Path::with_extension(
-                Path::file_stem(filename.as_ref()).unwrap().as_ref(),
-                format!("{}.bfd", n),
-            ));
+            let file = directory.as_ref().join(format!("{}.{}.bfd", filename, n));
             let params = if n == 0 {
                 Some(other_params.clone())
             } else {
@@ -159,5 +158,42 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
 
     pub fn info(&self) -> Vec<(usize, u8, u8, u8)> {
         self.members.iter().map(|m| m.info()).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_build_and_query_bfield() {
+        let mut tmp_dir = tempfile::tempdir().unwrap();
+        let n_secondaries = 4;
+        let mut bfield = BField::create(
+            tmp_dir.path(),
+            "bfield",
+            1_000_000,
+            10,
+            39,
+            4,
+            0.1,
+            0.025,
+            n_secondaries,
+            String::new(),
+        )
+        .expect("to build");
+
+        // Identity database
+        let max_value: u32 = 10_000;
+        for p in 0..n_secondaries {
+            for i in 0..max_value {
+                bfield.insert(&i.to_be_bytes().to_vec(), i, p as usize);
+            }
+        }
+
+        for i in 0..max_value {
+            let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
+            assert_eq!(i, val);
+        }
     }
 }
