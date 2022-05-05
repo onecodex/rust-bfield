@@ -1,11 +1,12 @@
 use std::io;
 use std::path::Path;
 
-use mmap_bitvec::combinatorial::rank;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
+// use crate::bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
+use crate::member::{BFieldLookup, BFieldMember, BFieldVal};
+use crate::combinatorial::rank;
 
 pub struct BField<T> {
     members: Vec<BFieldMember<T>>,
@@ -41,13 +42,12 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
                 None
             };
             let member = BFieldMember::create(
-                file,
                 cur_size,
                 n_hashes,
                 marker_width,
                 n_marker_bits,
                 params,
-            )?;
+            );
             members.push(member);
             cur_size = f64::max(
                 cur_size as f64 * secondary_scaledown,
@@ -65,32 +65,32 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         })
     }
 
-    pub fn from_file<P>(filename: P, read_only: bool) -> Result<Self, io::Error>
-    where
-        P: AsRef<Path>,
-    {
-        let mut members = Vec::new();
-        let mut n = 0;
-        loop {
-            let member_filename = filename.as_ref().with_file_name(Path::with_extension(
-                Path::file_stem(filename.as_ref()).unwrap().as_ref(),
-                format!("{}.bfd", n),
-            ));
-            if !member_filename.exists() {
-                break;
-            }
-            let member = BFieldMember::open(&member_filename, read_only)?;
-            members.push(member);
-            n += 1;
-        }
-        if members.is_empty() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("No Bfield found at {:?}", filename.as_ref()),
-            ));
-        }
-        Ok(BField { members, read_only })
-    }
+    // pub fn from_file<P>(filename: P, read_only: bool) -> Result<Self, io::Error>
+    // where
+    //     P: AsRef<Path>,
+    // {
+    //     let mut members = Vec::new();
+    //     let mut n = 0;
+    //     loop {
+    //         let member_filename = filename.as_ref().with_file_name(Path::with_extension(
+    //             Path::file_stem(filename.as_ref()).unwrap().as_ref(),
+    //             format!("{}.bfd", n),
+    //         ));
+    //         if !member_filename.exists() {
+    //             break;
+    //         }
+    //         let member = BFieldMember::open(&member_filename, read_only)?;
+    //         members.push(member);
+    //         n += 1;
+    //     }
+    //     if members.is_empty() {
+    //         return Err(io::Error::new(
+    //             io::ErrorKind::NotFound,
+    //             format!("No Bfield found at {:?}", filename.as_ref()),
+    //         ));
+    //     }
+    //     Ok(BField { members, read_only })
+    // }
 
     pub fn build_params(&self) -> (u8, u8, u8, Vec<usize>) {
         let (_, n_hashes, marker_width, n_marker_bits) = self.members[0].info();

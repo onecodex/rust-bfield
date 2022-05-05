@@ -2,6 +2,8 @@
 
 mod bfield;
 mod bfield_member;
+mod combinatorial;
+mod member;
 
 pub use crate::bfield::BField;
 pub use crate::bfield_member::BFieldVal;
