@@ -1,9 +1,9 @@
 use bfield::BField;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-fn build_bfield(n_secondaries: u8, max_value: u32) -> BField<String> {
-    let mut tmp_dir = tempfile::tempdir().unwrap();
-    let mut bfield = BField::create(
+fn build_bfield(n_secondaries: u8) -> BField<String> {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    BField::create(
         tmp_dir.path(),
         "bfield",
         1_000_000,
@@ -15,30 +15,31 @@ fn build_bfield(n_secondaries: u8, max_value: u32) -> BField<String> {
         n_secondaries,
         String::new(),
     )
-    .expect("to build");
+        .expect("to build")
+}
+
+fn bench_insertion(c: &mut Criterion) {
+    let mut bfield = build_bfield(4);
+    c.bench_function("bfield insertion", |b| {
+        b.iter(|| bfield.insert(&1_u32.to_be_bytes().to_vec(), 1_u32, 0))
+    });
+}
+
+fn bench_querying(c: &mut Criterion) {
+    let mut bfield = build_bfield(4);
 
     // Identity database
-    for p in 0..n_secondaries {
+    let max_value: u32 = 10_000;
+    for p in 0..4 {
         for i in 0..max_value {
             bfield.insert(&i.to_be_bytes().to_vec(), i, p as usize);
         }
     }
 
-    bfield
-}
-
-fn bench_creation(c: &mut Criterion) {
-    c.bench_function("bfield creation", |b| {
-        b.iter(|| build_bfield(black_box(4), black_box(10_000)))
-    });
-}
-
-fn bench_querying(c: &mut Criterion) {
-    let bfield = build_bfield(4, 10_000);
     c.bench_function("bfield querying", |b| {
         b.iter(|| black_box(bfield.get(black_box(&10_000_i32.to_be_bytes().to_vec()))))
     });
 }
 
-criterion_group!(benches, bench_creation, bench_querying);
+criterion_group!(benches, bench_insertion, bench_querying);
 criterion_main!(benches);

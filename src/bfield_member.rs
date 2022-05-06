@@ -187,6 +187,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
     #[inline]
     fn get_raw(&self, key: &[u8], k: u32) -> u128 {
+        assert!(self.params.n_hashes <= 16);
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
         let mut merged_marker = u128::MAX;
@@ -214,7 +215,6 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             }
         }
 
-        assert!(self.params.n_hashes <= 16);
         for pos in positions.iter().take(self.params.n_hashes as usize) {
             let marker = self.bitvec.get_range(*pos..*pos + marker_width);
             merged_marker &= marker;
