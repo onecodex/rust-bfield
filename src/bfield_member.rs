@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 #[cfg(feature = "prefetching")]
 use std::intrinsics;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use bincode::{deserialize, serialize};
 use mmap_bitvec::combinatorial::{rank, unrank};
@@ -37,6 +37,8 @@ pub(crate) struct BFieldParams<T> {
 
 pub(crate) struct BFieldMember<T> {
     bitvec: MmapBitVec,
+    // Used when loading mmap in memory to know where to save it if needed
+    pub(crate) filename: PathBuf,
     pub(crate) params: BFieldParams<T>,
 }
 
@@ -51,17 +53,15 @@ pub(crate) enum BFieldLookup {
 }
 
 impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
-    pub fn create<P>(
+    pub fn create<P: AsRef<Path>>(
         filename: P,
+        in_memory: bool,
         size: usize,
         n_hashes: u8,
         marker_width: u8,
         n_marker_bits: u8,
         other_params: Option<T>,
-    ) -> Result<Self, io::Error>
-    where
-        P: AsRef<Path>,
-    {
+    ) -> Result<Self, io::Error> {
         let bf_params = BFieldParams {
             n_hashes,
             marker_width,
@@ -70,50 +70,39 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         };
 
         let header: Vec<u8> = serialize(&bf_params).unwrap();
-        let bv = MmapBitVec::create(filename, size, BF_MAGIC, &header)?;
+        let bv = if in_memory {
+            MmapBitVec::from_memory(size)?
+        } else {
+            MmapBitVec::create(&filename, size, BF_MAGIC, &header)?
+        };
 
         Ok(BFieldMember {
+            filename: filename.as_ref().to_path_buf(),
             bitvec: bv,
             params: bf_params,
         })
     }
 
-    pub fn open<P>(filename: P, read_only: bool) -> Result<Self, io::Error>
-    where
-        P: AsRef<Path>,
-    {
-        let bv = MmapBitVec::open(filename, Some(&BF_MAGIC), read_only)?;
+    pub fn open<P: AsRef<Path>>(filename: P, read_only: bool) -> Result<Self, io::Error> {
+        let bv = MmapBitVec::open(&filename, Some(&BF_MAGIC), read_only)?;
         let bf_params: BFieldParams<T> = {
             let header = bv.header();
             deserialize(header).unwrap()
         };
 
         Ok(BFieldMember {
+            filename: filename.as_ref().to_path_buf(),
             bitvec: bv,
             params: bf_params,
         })
     }
 
-    #[cfg(test)]
-    pub fn in_memory(
-        size: usize,
-        n_hashes: u8,
-        marker_width: u8,
-        n_marker_bits: u8,
-    ) -> Result<Self, io::Error> {
-        let bf_params = BFieldParams {
-            n_hashes,
-            marker_width,
-            n_marker_bits,
-            other: None,
-        };
-
-        let bv = MmapBitVec::from_memory(size)?;
-
-        Ok(BFieldMember {
-            bitvec: bv,
-            params: bf_params,
-        })
+    pub fn persist_to_disk(mut self) -> Result<Self, io::Error> {
+        let header: Vec<u8> = serialize(&self.params).unwrap();
+        self.bitvec = self
+            .bitvec
+            .into_mmap_file(&self.filename, BF_MAGIC, &header)?;
+        Ok(self)
     }
 
     pub fn insert(&mut self, key: &[u8], value: BFieldVal) {
@@ -196,22 +185,10 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         for marker_ix in 0usize..self.params.n_hashes as usize {
             let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
             positions[marker_ix] = pos;
-            // TODO: benchmark me
-            // unsafe {
-            //     let byte_idx_st = (pos >> 3) as usize;
-            //     let ptr: *const u8 = self.bitvec.mmap.as_ptr().add(byte_idx_st);
-            //     prefetch_read(ptr);
-            // }
-
-            // pre-fetch the memory!
-            if cfg!(feature = "prefetching") {
-                unsafe {
-                    let byte_idx_st = (pos >> 3) as usize;
-                    #[allow(unused_variables)]
-                    let ptr: *const u8 = self.bitvec.mmap.as_ptr().add(byte_idx_st);
-                    #[cfg(feature = "prefetching")]
-                    intrinsics::prefetch_read_data(ptr, 3);
-                }
+            unsafe {
+                let byte_idx_st = (pos >> 3) as usize;
+                let ptr: *const u8 = self.bitvec.mmap.as_ptr().add(byte_idx_st);
+                prefetch_read(ptr);
             }
         }
 
@@ -246,7 +223,8 @@ mod tests {
 
     #[test]
     fn test_bfield() {
-        let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(1024, 3, 64, 4).unwrap();
+        let mut bfield: BFieldMember<usize> =
+            BFieldMember::create("test", true, 1024, 3, 64, 4, None).unwrap();
         // check that inserting keys adds new entries
         bfield.insert(b"test", 2);
         assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));
@@ -262,7 +240,8 @@ mod tests {
     fn test_bfield_collisions() {
         // comically small bfield with too many (16) hashes
         // and too many bits (8) to cause saturation
-        let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 16, 64, 8).unwrap();
+        let mut bfield: BFieldMember<usize> =
+            BFieldMember::create("test", true, 128, 16, 64, 8, None).unwrap();
 
         bfield.insert(b"test", 100);
         assert_eq!(bfield.get(b"test"), BFieldLookup::Indeterminate);
@@ -270,7 +249,8 @@ mod tests {
 
     #[test]
     fn test_bfield_bits_set() {
-        let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(128, 2, 16, 4).unwrap();
+        let mut bfield: BFieldMember<usize> =
+            BFieldMember::create("test", true, 128, 2, 16, 4, None).unwrap();
 
         bfield.insert(b"test", 100);
         assert_eq!(bfield.bitvec.rank(0..128), 8);
@@ -282,7 +262,8 @@ mod tests {
 
     #[test]
     fn test_bfield_mask_or_insert() {
-        let mut bfield: BFieldMember<usize> = BFieldMember::in_memory(1024, 2, 16, 4).unwrap();
+        let mut bfield: BFieldMember<usize> =
+            BFieldMember::create("test", true, 1024, 2, 16, 4, None).unwrap();
 
         bfield.insert(b"test", 2);
         assert_eq!(bfield.get(b"test"), BFieldLookup::Some(2));

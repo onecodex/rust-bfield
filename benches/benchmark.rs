@@ -15,7 +15,7 @@ fn build_bfield(n_secondaries: u8) -> BField<String> {
         n_secondaries,
         String::new(),
     )
-        .expect("to build")
+    .expect("to build")
 }
 
 fn bench_insertion(c: &mut Criterion) {

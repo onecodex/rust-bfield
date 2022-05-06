@@ -24,6 +24,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         secondary_scaledown: f64, // beta
         max_scaledown: f64,
         n_secondaries: u8,
+        in_memory: bool,
         other_params: T,
     ) -> Result<Self, io::Error>
     where
@@ -42,6 +43,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
             };
             let member = BFieldMember::create(
                 file,
+                in_memory,
                 cur_size,
                 n_hashes,
                 marker_width,
@@ -90,6 +92,15 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
             ));
         }
         Ok(BField { members, read_only })
+    }
+
+    pub fn persist_to_disk(&mut self) -> Result<(), io::Error> {
+        let mut members = Vec::with_capacity(self.members.len());
+        for m in self.members.drain(..) {
+            members.push(m.persist_to_disk()?);
+        }
+        self.members = members;
+        Ok(())
     }
 
     pub fn build_params(&self) -> (u8, u8, u8, Vec<usize>) {
@@ -166,8 +177,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_build_and_query_bfield() {
-        let mut tmp_dir = tempfile::tempdir().unwrap();
+    fn can_build_and_query_file_bfield() {
+        let tmp_dir = tempfile::tempdir().unwrap();
         let n_secondaries = 4;
         let mut bfield = BField::create(
             tmp_dir.path(),
@@ -179,6 +190,7 @@ mod tests {
             0.1,
             0.025,
             n_secondaries,
+            false,
             String::new(),
         )
         .expect("to build");
@@ -191,6 +203,47 @@ mod tests {
             }
         }
 
+        for i in 0..max_value {
+            let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
+            assert_eq!(i, val);
+        }
+    }
+
+    #[test]
+    fn can_build_and_query_in_memory_bfield() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let n_secondaries = 4;
+        let mut bfield = BField::create(
+            tmp_dir.path(),
+            "bfield",
+            1_000_000,
+            10,
+            39,
+            4,
+            0.1,
+            0.025,
+            n_secondaries,
+            true,
+            String::new(),
+        )
+        .expect("to build");
+
+        // Identity database
+        let max_value: u32 = 10_000;
+        for p in 0..n_secondaries {
+            for i in 0..max_value {
+                bfield.insert(&i.to_be_bytes().to_vec(), i, p as usize);
+            }
+        }
+
+        for i in 0..max_value {
+            let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
+            assert_eq!(i, val);
+        }
+        bfield.persist_to_disk().unwrap();
+        for m in &bfield.members {
+            assert!(m.filename.exists());
+        }
         for i in 0..max_value {
             let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
             assert_eq!(i, val);
