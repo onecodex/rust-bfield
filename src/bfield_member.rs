@@ -69,10 +69,10 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             other: other_params,
         };
 
-        let header: Vec<u8> = serialize(&bf_params).unwrap();
         let bv = if in_memory {
             MmapBitVec::from_memory(size)?
         } else {
+            let header: Vec<u8> = serialize(&bf_params).unwrap();
             MmapBitVec::create(&filename, size, BF_MAGIC, &header)?
         };
 

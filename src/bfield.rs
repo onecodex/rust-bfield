@@ -1,5 +1,5 @@
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use mmap_bitvec::combinatorial::rank;
 use serde::de::DeserializeOwned;
@@ -11,6 +11,10 @@ pub struct BField<T> {
     members: Vec<BFieldMember<T>>,
     read_only: bool,
 }
+
+// This is safe in theory, as the mmap is send+sync
+unsafe impl<T> Send for BField<T> {}
+unsafe impl<T> Sync for BField<T> {}
 
 impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
     #[allow(clippy::too_many_arguments)]
@@ -67,28 +71,42 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         })
     }
 
-    pub fn from_file<P>(filename: P, read_only: bool) -> Result<Self, io::Error>
-    where
-        P: AsRef<Path>,
-    {
+    pub fn load<P: AsRef<Path>>(main_db_path: P, read_only: bool) -> Result<Self, io::Error> {
         let mut members = Vec::new();
         let mut n = 0;
+
+        let main_db_filename = match main_db_path.as_ref().file_name() {
+            Some(p) => p.to_string_lossy(),
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("Couldn't get filename from {:?}", main_db_path.as_ref()),
+                ));
+            }
+        };
+        assert!(main_db_path.as_ref().parent().is_some());
+        assert!(main_db_filename.ends_with("0.bfd"));
+
         loop {
-            let member_filename = filename.as_ref().with_file_name(Path::with_extension(
-                Path::file_stem(filename.as_ref()).unwrap().as_ref(),
-                format!("{}.bfd", n),
-            ));
-            if !member_filename.exists() {
+            let member_filename =
+                PathBuf::from(&main_db_filename.replace("0.bfd", &format!("{n}.bfd")));
+            let member_path = main_db_path
+                .as_ref()
+                .parent()
+                .unwrap()
+                .join(member_filename);
+            if !member_path.exists() {
                 break;
             }
-            let member = BFieldMember::open(&member_filename, read_only)?;
+            let member = BFieldMember::open(&member_path, read_only)?;
             members.push(member);
             n += 1;
         }
+
         if members.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("No Bfield found at {:?}", filename.as_ref()),
+                format!("No Bfield found at {:?}", main_db_path.as_ref()),
             ));
         }
         Ok(BField { members, read_only })
@@ -203,6 +221,14 @@ mod tests {
             }
         }
 
+        for i in 0..max_value {
+            let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
+            assert_eq!(i, val);
+        }
+        drop(bfield);
+
+        // and we can load them
+        let bfield = BField::<String>::load(&tmp_dir.path().join("bfield.0.bfd"), true).unwrap();
         for i in 0..max_value {
             let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
             assert_eq!(i, val);

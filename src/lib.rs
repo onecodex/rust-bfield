@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "prefetching", feature(core_intrinsics))]
-
 mod bfield;
 mod bfield_member;
 
