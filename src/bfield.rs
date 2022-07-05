@@ -112,13 +112,12 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         Ok(BField { members, read_only })
     }
 
-    pub fn persist_to_disk(&mut self) -> Result<(), io::Error> {
+    pub fn persist_to_disk(self) -> Result<Self, io::Error> {
         let mut members = Vec::with_capacity(self.members.len());
-        for m in self.members.drain(..) {
+        for m in self.members {
             members.push(m.persist_to_disk()?);
         }
-        self.members = members;
-        Ok(())
+        Ok(Self {members, read_only: self.read_only})
     }
 
     pub fn build_params(&self) -> (u8, u8, u8, Vec<usize>) {
@@ -145,16 +144,16 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
     /// of the b-field by making them indeterminate (which will make them fall
     /// back to the secondaries where they don't exist and thus it'll appear
     /// as if they were never inserted to begin with)
-    pub fn force_insert(&mut self, key: &[u8], value: BFieldVal) {
+    pub fn force_insert(&self, key: &[u8], value: BFieldVal) {
         debug_assert!(!self.read_only, "Can't insert into read_only bfields");
-        for secondary in self.members.iter_mut() {
+        for secondary in &self.members {
             if secondary.mask_or_insert(key, value) {
                 break;
             }
         }
     }
 
-    pub fn insert(&mut self, key: &[u8], value: BFieldVal, pass: usize) -> bool {
+    pub fn insert(&self, key: &[u8], value: BFieldVal, pass: usize) -> bool {
         debug_assert!(!self.read_only, "Can't insert into read_only bfields");
         debug_assert!(
             pass < self.members.len(),
@@ -198,7 +197,7 @@ mod tests {
     fn can_build_and_query_file_bfield() {
         let tmp_dir = tempfile::tempdir().unwrap();
         let n_secondaries = 4;
-        let mut bfield = BField::create(
+        let bfield = BField::create(
             tmp_dir.path(),
             "bfield",
             1_000_000,

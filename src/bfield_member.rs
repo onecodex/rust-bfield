@@ -1,3 +1,4 @@
+use std::cell::UnsafeCell;
 use std::cmp::Ordering;
 #[cfg(feature = "prefetching")]
 use std::intrinsics;
@@ -10,6 +11,25 @@ use mmap_bitvec::{BitVector, MmapBitVec};
 use murmurhash3::murmurhash3_x64_128;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+
+struct BitVec {
+    bv: UnsafeCell<MmapBitVec>,
+}
+
+impl BitVec {
+    pub fn new(bv: MmapBitVec) -> Self {
+        Self {
+            bv: UnsafeCell::new(bv),
+        }
+    }
+
+    pub fn get(&self) -> &mut MmapBitVec {
+        unsafe { &mut *self.bv.get() }
+    }
+}
+
+unsafe impl Send for BitVec {}
+unsafe impl Sync for BitVec {}
 
 // Empty function on some archs
 #[allow(unused_variables)]
@@ -36,7 +56,7 @@ pub(crate) struct BFieldParams<T> {
 }
 
 pub(crate) struct BFieldMember<T> {
-    bitvec: MmapBitVec,
+    bitvec: BitVec,
     // Used when loading mmap in memory to know where to save it if needed
     pub(crate) filename: PathBuf,
     pub(crate) params: BFieldParams<T>,
@@ -78,7 +98,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
         Ok(BFieldMember {
             filename: filename.as_ref().to_path_buf(),
-            bitvec: bv,
+            bitvec: BitVec::new(bv),
             params: bf_params,
         })
     }
@@ -92,20 +112,22 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
         Ok(BFieldMember {
             filename: filename.as_ref().to_path_buf(),
-            bitvec: bv,
+            bitvec: BitVec::new(bv),
             params: bf_params,
         })
     }
 
-    pub fn persist_to_disk(mut self) -> Result<Self, io::Error> {
+    pub fn persist_to_disk(self) -> Result<Self, io::Error> {
         let header: Vec<u8> = serialize(&self.params).unwrap();
-        self.bitvec = self
-            .bitvec
-            .into_mmap_file(&self.filename, BF_MAGIC, &header)?;
-        Ok(self)
+        let bitvec = BitVec::new(self.bitvec.bv.into_inner().into_mmap_file(
+            &self.filename,
+            BF_MAGIC,
+            &header,
+        )?);
+        Ok(Self {bitvec, filename: self.filename, params: self.params})
     }
 
-    pub fn insert(&mut self, key: &[u8], value: BFieldVal) {
+    pub fn insert(&self, key: &[u8], value: BFieldVal) {
         // TODO: need to do a check that `value` < allowable range based on
         // self.params.marker_width and self.params.n_marker_bits
         let k = self.params.n_marker_bits;
@@ -113,13 +135,13 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     }
 
     #[inline]
-    fn insert_raw(&mut self, key: &[u8], marker: u128) {
+    fn insert_raw(&self, key: &[u8], marker: u128) {
         let marker_width = self.params.marker_width as usize;
         let hash = murmurhash3_x64_128(key, 0);
 
         for marker_ix in 0usize..self.params.n_hashes as usize {
-            let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
-            self.bitvec.set_range(pos..pos + marker_width, marker);
+            let pos = marker_pos(hash, marker_ix, self.bitvec.get().size(), marker_width);
+            self.bitvec.get().set_range(pos..pos + marker_width, marker);
         }
     }
 
@@ -130,7 +152,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
     /// Returns `true` if the value was inserted or was already present with
     /// the correct value; `false` if masking occured or if it was already
     /// indeterminate.
-    pub fn mask_or_insert(&mut self, key: &[u8], value: BFieldVal) -> bool {
+    pub fn mask_or_insert(&self, key: &[u8], value: BFieldVal) -> bool {
         let correct_marker = rank(value as usize, self.params.n_marker_bits);
         let k = u32::from(self.params.n_marker_bits);
         let existing_marker = self.get_raw(key, k);
@@ -183,17 +205,17 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         let mut positions: [usize; 16] = [0; 16]; // support up to 16 hashes
         #[allow(clippy::needless_range_loop)]
         for marker_ix in 0usize..self.params.n_hashes as usize {
-            let pos = marker_pos(hash, marker_ix, self.bitvec.size(), marker_width);
+            let pos = marker_pos(hash, marker_ix, self.bitvec.get().size(), marker_width);
             positions[marker_ix] = pos;
             unsafe {
                 let byte_idx_st = (pos >> 3) as usize;
-                let ptr: *const u8 = self.bitvec.mmap.as_ptr().add(byte_idx_st);
+                let ptr: *const u8 = self.bitvec.get().mmap.as_ptr().add(byte_idx_st);
                 prefetch_read(ptr);
             }
         }
 
         for pos in positions.iter().take(self.params.n_hashes as usize) {
-            let marker = self.bitvec.get_range(*pos..*pos + marker_width);
+            let marker = self.bitvec.get().get_range(*pos..*pos + marker_width);
             merged_marker &= marker;
             if merged_marker.count_ones() < k {
                 return 0;
@@ -204,7 +226,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
     pub fn info(&self) -> (usize, u8, u8, u8) {
         (
-            self.bitvec.size(),
+            self.bitvec.get().size(),
             self.params.n_hashes,
             self.params.marker_width,
             self.params.n_marker_bits,
@@ -223,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_bfield() {
-        let mut bfield: BFieldMember<usize> =
+        let bfield: BFieldMember<usize> =
             BFieldMember::create("test", true, 1024, 3, 64, 4, None).unwrap();
         // check that inserting keys adds new entries
         bfield.insert(b"test", 2);
@@ -240,7 +262,7 @@ mod tests {
     fn test_bfield_collisions() {
         // comically small bfield with too many (16) hashes
         // and too many bits (8) to cause saturation
-        let mut bfield: BFieldMember<usize> =
+        let bfield: BFieldMember<usize> =
             BFieldMember::create("test", true, 128, 16, 64, 8, None).unwrap();
 
         bfield.insert(b"test", 100);
@@ -249,20 +271,20 @@ mod tests {
 
     #[test]
     fn test_bfield_bits_set() {
-        let mut bfield: BFieldMember<usize> =
+        let bfield: BFieldMember<usize> =
             BFieldMember::create("test", true, 128, 2, 16, 4, None).unwrap();
 
         bfield.insert(b"test", 100);
-        assert_eq!(bfield.bitvec.rank(0..128), 8);
+        assert_eq!(bfield.bitvec.get().rank(0..128), 8);
         bfield.insert(b"test2", 200);
-        assert_eq!(bfield.bitvec.rank(0..128), 16);
+        assert_eq!(bfield.bitvec.get().rank(0..128), 16);
         bfield.insert(b"test3", 300);
-        assert!(bfield.bitvec.rank(0..128) < 24); // 23 bits set
+        assert!(bfield.bitvec.get().rank(0..128) < 24); // 23 bits set
     }
 
     #[test]
     fn test_bfield_mask_or_insert() {
-        let mut bfield: BFieldMember<usize> =
+        let bfield: BFieldMember<usize> =
             BFieldMember::create("test", true, 1024, 2, 16, 4, None).unwrap();
 
         bfield.insert(b"test", 2);
