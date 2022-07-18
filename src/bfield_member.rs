@@ -23,6 +23,7 @@ impl BitVec {
         }
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn get(&self) -> &mut MmapBitVec {
         unsafe { &mut *self.bv.get() }
     }
@@ -124,7 +125,11 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             BF_MAGIC,
             &header,
         )?);
-        Ok(Self {bitvec, filename: self.filename, params: self.params})
+        Ok(Self {
+            bitvec,
+            filename: self.filename,
+            params: self.params,
+        })
     }
 
     pub fn insert(&self, key: &[u8], value: BFieldVal) {

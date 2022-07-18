@@ -117,7 +117,10 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         for m in self.members {
             members.push(m.persist_to_disk()?);
         }
-        Ok(Self {members, read_only: self.read_only})
+        Ok(Self {
+            members,
+            read_only: self.read_only,
+        })
     }
 
     pub fn build_params(&self) -> (u8, u8, u8, Vec<usize>) {
