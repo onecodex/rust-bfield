@@ -1,5 +1,5 @@
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use mmap_bitvec::combinatorial::rank;
 use serde::de::DeserializeOwned;
@@ -12,10 +12,15 @@ pub struct BField<T> {
     read_only: bool,
 }
 
-impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
+// This is safe in theory, as the mmap is send+sync
+unsafe impl<T> Send for BField<T> {}
+unsafe impl<T> Sync for BField<T> {}
+
+impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
     #[allow(clippy::too_many_arguments)]
     pub fn create<P>(
-        filename: P,
+        directory: P,
+        filename: &str,
         size: usize,
         n_hashes: u8,             // k
         marker_width: u8,         // nu
@@ -23,19 +28,18 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         secondary_scaledown: f64, // beta
         max_scaledown: f64,
         n_secondaries: u8,
+        in_memory: bool,
         other_params: T,
     ) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
     {
+        debug_assert!(!filename.is_empty());
         let mut cur_size = size;
         let mut members = Vec::new();
+
         for n in 0..n_secondaries {
-            // panics if filename == ''
-            let file = filename.as_ref().with_file_name(Path::with_extension(
-                Path::file_stem(filename.as_ref()).unwrap().as_ref(),
-                format!("{}.bfd", n),
-            ));
+            let file = directory.as_ref().join(format!("{}.{}.bfd", filename, n));
             let params = if n == 0 {
                 Some(other_params.clone())
             } else {
@@ -43,6 +47,7 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
             };
             let member = BFieldMember::create(
                 file,
+                in_memory,
                 cur_size,
                 n_hashes,
                 marker_width,
@@ -66,31 +71,56 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         })
     }
 
-    pub fn from_file<P>(filename: P, read_only: bool) -> Result<Self, io::Error>
-    where
-        P: AsRef<Path>,
-    {
+    pub fn load<P: AsRef<Path>>(main_db_path: P, read_only: bool) -> Result<Self, io::Error> {
         let mut members = Vec::new();
         let mut n = 0;
+
+        let main_db_filename = match main_db_path.as_ref().file_name() {
+            Some(p) => p.to_string_lossy(),
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("Couldn't get filename from {:?}", main_db_path.as_ref()),
+                ));
+            }
+        };
+        assert!(main_db_path.as_ref().parent().is_some());
+        assert!(main_db_filename.ends_with("0.bfd"));
+
         loop {
-            let member_filename = filename.as_ref().with_file_name(Path::with_extension(
-                Path::file_stem(filename.as_ref()).unwrap().as_ref(),
-                format!("{}.bfd", n),
-            ));
-            if !member_filename.exists() {
+            let member_filename =
+                PathBuf::from(&main_db_filename.replace("0.bfd", &format!("{n}.bfd")));
+            let member_path = main_db_path
+                .as_ref()
+                .parent()
+                .unwrap()
+                .join(member_filename);
+            if !member_path.exists() {
                 break;
             }
-            let member = BFieldMember::open(&member_filename, read_only)?;
+            let member = BFieldMember::open(&member_path, read_only)?;
             members.push(member);
             n += 1;
         }
+
         if members.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("No Bfield found at {:?}", filename.as_ref()),
+                format!("No Bfield found at {:?}", main_db_path.as_ref()),
             ));
         }
         Ok(BField { members, read_only })
+    }
+
+    pub fn persist_to_disk(self) -> Result<Self, io::Error> {
+        let mut members = Vec::with_capacity(self.members.len());
+        for m in self.members {
+            members.push(m.persist_to_disk()?);
+        }
+        Ok(Self {
+            members,
+            read_only: self.read_only,
+        })
     }
 
     pub fn build_params(&self) -> (u8, u8, u8, Vec<usize>) {
@@ -117,16 +147,16 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
     /// of the b-field by making them indeterminate (which will make them fall
     /// back to the secondaries where they don't exist and thus it'll appear
     /// as if they were never inserted to begin with)
-    pub fn force_insert(&mut self, key: &[u8], value: BFieldVal) {
+    pub fn force_insert(&self, key: &[u8], value: BFieldVal) {
         debug_assert!(!self.read_only, "Can't insert into read_only bfields");
-        for secondary in self.members.iter_mut() {
-            if secondary.mask_or_insert(&key, value) {
+        for secondary in &self.members {
+            if secondary.mask_or_insert(key, value) {
                 break;
             }
         }
     }
 
-    pub fn insert(&mut self, key: &[u8], value: BFieldVal, pass: usize) -> bool {
+    pub fn insert(&self, key: &[u8], value: BFieldVal, pass: usize) -> bool {
         debug_assert!(!self.read_only, "Can't insert into read_only bfields");
         debug_assert!(
             pass < self.members.len(),
@@ -134,19 +164,19 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
         );
         if pass > 0 {
             for secondary in self.members[..pass].iter() {
-                match secondary.get(&key) {
+                match secondary.get(key) {
                     BFieldLookup::Indeterminate => continue,
                     _ => return false,
                 }
             }
         }
-        self.members[pass].insert(&key, value);
+        self.members[pass].insert(key, value);
         true
     }
 
     pub fn get(&self, key: &[u8]) -> Option<BFieldVal> {
         for secondary in self.members.iter() {
-            match secondary.get(&key) {
+            match secondary.get(key) {
                 BFieldLookup::Indeterminate => continue,
                 BFieldLookup::Some(value) => return Some(value),
                 BFieldLookup::None => return None,
@@ -159,5 +189,92 @@ impl<'a, T: Clone + DeserializeOwned + Serialize> BField<T> {
 
     pub fn info(&self) -> Vec<(usize, u8, u8, u8)> {
         self.members.iter().map(|m| m.info()).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_build_and_query_file_bfield() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let n_secondaries = 4;
+        let bfield = BField::create(
+            tmp_dir.path(),
+            "bfield",
+            1_000_000,
+            10,
+            39,
+            4,
+            0.1,
+            0.025,
+            n_secondaries,
+            false,
+            String::new(),
+        )
+        .expect("to build");
+
+        // Identity database
+        let max_value: u32 = 10_000;
+        for p in 0..n_secondaries {
+            for i in 0..max_value {
+                bfield.insert(&i.to_be_bytes().to_vec(), i, p as usize);
+            }
+        }
+
+        for i in 0..max_value {
+            let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
+            assert_eq!(i, val);
+        }
+        drop(bfield);
+
+        // and we can load them
+        let bfield = BField::<String>::load(&tmp_dir.path().join("bfield.0.bfd"), true).unwrap();
+        for i in 0..max_value {
+            let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
+            assert_eq!(i, val);
+        }
+    }
+
+    #[test]
+    fn can_build_and_query_in_memory_bfield() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let n_secondaries = 4;
+        let mut bfield = BField::create(
+            tmp_dir.path(),
+            "bfield",
+            1_000_000,
+            10,
+            39,
+            4,
+            0.1,
+            0.025,
+            n_secondaries,
+            true,
+            String::new(),
+        )
+        .expect("to build");
+
+        // Identity database
+        let max_value: u32 = 10_000;
+        for p in 0..n_secondaries {
+            for i in 0..max_value {
+                bfield.insert(&i.to_be_bytes().to_vec(), i, p as usize);
+            }
+        }
+
+        for i in 0..max_value {
+            let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
+            assert_eq!(i, val);
+        }
+        bfield.persist_to_disk().unwrap();
+        for m in &bfield.members {
+            assert!(m.filename.exists());
+        }
+        for i in 0..max_value {
+            let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
+            assert_eq!(i, val);
+        }
     }
 }
