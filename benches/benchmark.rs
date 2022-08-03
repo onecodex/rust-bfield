@@ -13,6 +13,7 @@ fn build_bfield(n_secondaries: u8) -> BField<String> {
         0.1,
         0.025,
         n_secondaries,
+        false,
         String::new(),
     )
     .expect("to build")

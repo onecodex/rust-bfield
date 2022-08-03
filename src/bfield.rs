@@ -293,7 +293,7 @@ mod tests {
             let val = bfield.get(&i.to_be_bytes().to_vec()).unwrap();
             assert_eq!(i, val);
         }
-        bfield.persist_to_disk().unwrap();
+        bfield = bfield.persist_to_disk().unwrap();
         for m in &bfield.members {
             assert!(m.filename.exists());
         }
