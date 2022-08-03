@@ -63,6 +63,7 @@ pub(crate) struct BFieldMember<T> {
     pub(crate) params: BFieldParams<T>,
 }
 
+/// A simple type alias to make the code more readable
 pub type BFieldVal = u32;
 const BF_MAGIC: [u8; 2] = [0xBF, 0x1D];
 

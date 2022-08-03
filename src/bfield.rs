@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::bfield_member::{BFieldLookup, BFieldMember, BFieldVal};
 
+/// The struct holding the various bfields
 pub struct BField<T> {
     members: Vec<BFieldMember<T>>,
     read_only: bool,
@@ -17,6 +18,18 @@ unsafe impl<T> Send for BField<T> {}
 unsafe impl<T> Sync for BField<T> {}
 
 impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
+    /// The (complicated) method to create a bfield.
+    /// The bfield files will be created in `directory` with the given `filename` and the
+    /// suffixes `(0..n_secondaries).bfd`
+    /// `size` is the primary bfield size, subsequent bfield sizes will be determined by
+    /// `secondary_scaledown` and `max_scaledown`.
+    /// If you set `in_memory` to true, remember to call `persist_to_disk` when it's built to
+    /// save it.
+    /// The params are the following in the paper:
+    /// `n_hashes` -> k
+    /// `marker_width` -> v (nu)
+    /// `n_marker_bits` -> κ (kappa)
+    /// `secondary_scaledown` -> β (beta)
     #[allow(clippy::too_many_arguments)]
     pub fn create<P>(
         directory: P,
@@ -71,6 +84,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         })
     }
 
+    /// Loads the bfield given the path to the "main" db path (eg the one ending with `0.bfd`).
     pub fn load<P: AsRef<Path>>(main_db_path: P, read_only: bool) -> Result<Self, io::Error> {
         let mut members = Vec::new();
         let mut n = 0;
@@ -112,6 +126,8 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         Ok(BField { members, read_only })
     }
 
+    /// Write the current bfields to disk.
+    /// Only useful if you are creating a bfield in memory
     pub fn persist_to_disk(self) -> Result<Self, io::Error> {
         let mut members = Vec::with_capacity(self.members.len());
         for m in self.members {
@@ -123,12 +139,14 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         })
     }
 
+    /// Returns (n_hashes, marker_width, n_marker_bits, Vec<size of each member>)
     pub fn build_params(&self) -> (u8, u8, u8, Vec<usize>) {
         let (_, n_hashes, marker_width, n_marker_bits) = self.members[0].info();
         let sizes = self.members.iter().map(|i| i.info().0).collect();
         (n_hashes, marker_width, n_marker_bits, sizes)
     }
 
+    /// Returns the params given at build time to the bfields
     pub fn params(&self) -> &Option<T> {
         &self.members[0].params.other
     }
@@ -156,6 +174,9 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         }
     }
 
+    /// Insert the given key/value at the given pass
+    /// Returns whether the value was inserted during this call, eg will return `false` if
+    /// the value was already present.
     pub fn insert(&self, key: &[u8], value: BFieldVal, pass: usize) -> bool {
         debug_assert!(!self.read_only, "Can't insert into read_only bfields");
         debug_assert!(
@@ -174,6 +195,8 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         true
     }
 
+    /// Returns the value of the given key if found, None otherwise.
+    /// If the value is indeterminate, we still return None.
     pub fn get(&self, key: &[u8]) -> Option<BFieldVal> {
         for secondary in self.members.iter() {
             match secondary.get(key) {
@@ -187,6 +210,8 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         None
     }
 
+    /// Get the info of each member
+    /// Returns Vec<(size, n_hashes, marker_width, n_marker_bits)>
     pub fn info(&self) -> Vec<(usize, u8, u8, u8)> {
         self.members.iter().map(|m| m.info()).collect()
     }
