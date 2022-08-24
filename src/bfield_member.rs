@@ -121,11 +121,10 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
 
     pub fn persist_to_disk(self) -> Result<Self, io::Error> {
         let header: Vec<u8> = serialize(&self.params).unwrap();
-        let bitvec = BitVec::new(self.bitvec.bv.into_inner().into_mmap_file(
-            &self.filename,
-            BF_MAGIC,
-            &header,
-        )?);
+        self.bitvec
+            .get()
+            .save_to_disk(&self.filename, BF_MAGIC, &header)?;
+        let bitvec = BitVec::new(MmapBitVec::open(&self.filename, Some(&BF_MAGIC), false)?);
         Ok(Self {
             bitvec,
             filename: self.filename,
