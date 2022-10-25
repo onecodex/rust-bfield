@@ -162,7 +162,7 @@ $$1-(1 - \frac{1}{m})^{kn}$$
 
 After each of the $k$ individual accesses that comprise the $\mathtt{LOOKUP}$ operation for a given bit array (one per hash function), the probability than an individual bit is incorrectly set to 1 is:
 
-$$(1-(1-\frac{1}{m})^{kn})^{k} \approx (1-e^{kn/m})^{k}$$
+$$(1-(1-\frac{1}{m})^{kn})^{k} \approx (1-e^{-kn/m})^{k}$$
 
 Substituting the formulas for optimal $m$ and $k$ values from above yields:
 
