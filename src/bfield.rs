@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use mmap_bitvec::combinatorial::rank;
+use crate::combinatorial::rank;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

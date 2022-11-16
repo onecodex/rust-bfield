@@ -5,7 +5,9 @@
 
 mod bfield;
 mod bfield_member;
+/// Some combinatorial utilities
+mod combinatorial;
 
 pub use crate::bfield::BField;
 pub use crate::bfield_member::BFieldVal;
-pub use mmap_bitvec::combinatorial::choose;
+pub use combinatorial::choose;
