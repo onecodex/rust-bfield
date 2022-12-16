@@ -214,7 +214,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             let pos = marker_pos(hash, marker_ix, self.bitvec.get().size(), marker_width);
             positions[marker_ix] = pos;
             unsafe {
-                let byte_idx_st = (pos >> 3) as usize;
+                let byte_idx_st = pos >> 3;
                 let ptr: *const u8 = self.bitvec.get().mmap.as_ptr().add(byte_idx_st);
                 prefetch_read(ptr);
             }

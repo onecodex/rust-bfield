@@ -33,7 +33,7 @@ pub fn rank(value: usize, k: u8) -> u128 {
     assert!(k > 0 && k < 10, "kappa needs to be less than 10");
     // it's possible this may overflow if value > (128 choose k) or return
     // a bad value (0) if value > (128 choose k) and k == 1 or 2
-    if value as usize >= MARKER_TABLE_SIZE {
+    if value >= MARKER_TABLE_SIZE {
         let mut marker = MARKER_TABLES[&k][MARKER_TABLE_SIZE - 1];
         for _ in 0..(value - MARKER_TABLE_SIZE) {
             // next_rank would overflow if we pass 0, we return it instead
