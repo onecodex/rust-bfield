@@ -5,8 +5,8 @@ use std::intrinsics;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use bincode::{deserialize, serialize};
 use crate::combinatorial::{rank, unrank};
+use bincode::{deserialize, serialize};
 use mmap_bitvec::{BitVector, MmapBitVec};
 use murmurhash3::murmurhash3_x64_128;
 use serde::de::DeserializeOwned;
