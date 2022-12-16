@@ -43,8 +43,6 @@ fn prefetch_read(pointer: *const u8) {
         unsafe {
             arch_impl::_mm_prefetch::<{ arch_impl::_MM_HINT_NTA }>(pointer as *const i8);
         }
-
-        return;
     }
 }
 
