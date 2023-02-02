@@ -5,8 +5,8 @@ use std::intrinsics;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use crate::combinatorial::{rank, unrank};
 use bincode::{deserialize, serialize};
-use mmap_bitvec::combinatorial::{rank, unrank};
 use mmap_bitvec::{BitVector, MmapBitVec};
 use murmurhash3::murmurhash3_x64_128;
 use serde::de::DeserializeOwned;
@@ -43,8 +43,6 @@ fn prefetch_read(pointer: *const u8) {
         unsafe {
             arch_impl::_mm_prefetch::<{ arch_impl::_MM_HINT_NTA }>(pointer as *const i8);
         }
-
-        return;
     }
 }
 
@@ -65,6 +63,7 @@ pub(crate) struct BFieldMember<T> {
 
 /// A simple type alias to make the code more readable
 pub type BFieldVal = u32;
+/// Magic bytes used to indicate the `bfield` file type for `MmapBitvec`
 const BF_MAGIC: [u8; 2] = [0xBF, 0x1D];
 
 #[derive(Debug, PartialEq)]
@@ -95,7 +94,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             MmapBitVec::from_memory(size)?
         } else {
             let header: Vec<u8> = serialize(&bf_params).unwrap();
-            MmapBitVec::create(&filename, size, BF_MAGIC, &header)?
+            MmapBitVec::create(&filename, size, Some(BF_MAGIC), &header)?
         };
 
         Ok(BFieldMember {
@@ -123,7 +122,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
         let header: Vec<u8> = serialize(&self.params).unwrap();
         self.bitvec
             .get()
-            .save_to_disk(&self.filename, BF_MAGIC, &header)?;
+            .save_to_disk(&self.filename, Some(BF_MAGIC), &header)?;
         let bitvec = BitVec::new(MmapBitVec::open(&self.filename, Some(&BF_MAGIC), false)?);
         Ok(Self {
             bitvec,
@@ -213,7 +212,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BFieldMember<T> {
             let pos = marker_pos(hash, marker_ix, self.bitvec.get().size(), marker_width);
             positions[marker_ix] = pos;
             unsafe {
-                let byte_idx_st = (pos >> 3) as usize;
+                let byte_idx_st = pos >> 3;
                 let ptr: *const u8 = self.bitvec.get().mmap.as_ptr().add(byte_idx_st);
                 prefetch_read(ptr);
             }

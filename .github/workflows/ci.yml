@@ -15,13 +15,8 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.40.0
+          toolchain: 1.60.0
           override: true
-
-      - name: create SSH key
-        uses: webfactory/ssh-agent@v0.2.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: version info
         run:  rustc --version; cargo --version;
@@ -41,11 +36,6 @@ jobs:
           toolchain: nightly
           override: true
 
-      - name: create SSH key
-        uses: webfactory/ssh-agent@v0.2.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
       - name: version info
         run:  rustc --version; cargo --version;
 
@@ -64,11 +54,6 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: create SSH key
-        uses: webfactory/ssh-agent@v0.2.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -85,11 +70,6 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-
-      - name: create SSH key
-        uses: webfactory/ssh-agent@v0.2.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - uses: actions-rs/cargo@v1
         with:
