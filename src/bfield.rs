@@ -52,7 +52,7 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
         let mut members = Vec::new();
 
         for n in 0..n_secondaries {
-            let file = directory.as_ref().join(format!("{}.{}.bfd", filename, n));
+            let file = directory.as_ref().join(format!("{filename}.{n}.bfd"));
             let params = if n == 0 {
                 Some(other_params.clone())
             } else {
