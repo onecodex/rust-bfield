@@ -2,7 +2,7 @@
 
 The B-field is a novel, probabilistic data structure for storing key-value pairs (or, said differently, it is a probabilistic associative array or map). B-fields support insertion (`insert`) and lookup (`get`) operations, and share a number of mathematical and performance properties with the well-known Bloom filter.
 
-At [One Codex](https://www.onecodex.com), we use the `rust-bfield` crate in bioinformatics applications to efficiently store associations between billions of $k$-length nucleotide substrings (["k-mers"]()) and [their taxonomic identity]() _**using only X-Y bytes per `(kmer, value)` pair.**_ We hope others are able to use this library (or implementations in other languages) for applications in bioinformatics and beyond.
+At [One Codex](https://www.onecodex.com), we use the `rust-bfield` crate in bioinformatics applications to efficiently store associations between billions of $k$-length nucleotide substrings (["k-mers"](https://en.wikipedia.org/wiki/K-mer)) and [their taxonomic identity](https://www.ncbi.nlm.nih.gov/taxonomy) _**using only X-Y bytes per `(kmer, value)` pair.**_ We hope others are able to use this library (or implementations in other languages) for applications in bioinformatics and beyond.
 
 > _Note: In the [Implementation Details](#implementation-details) section below, we detail the use of this B-field implementation in Rust and use `code` formatting and English parameter names (e.g., we discuss the B-field being a data structure for storing `(key, value)` pairs). In the following [Formal Data Structure Details](#formal-data-structure-details) section, we detail the design and mechanics of the B-field using mathematical notation (i.e., we discuss it as an associate array mapping a set of_ $(x, y)$ _pairs). The generated Rust documentation includes both notations for ease of reference._
 
@@ -13,7 +13,7 @@ A B-field stores a `(key, value)` mapping **without directly storing either the 
 * False positives (which we later describe as occurring at a tunable rate of $\alpha$) in which the `get` operation for a `key` _that was not inserted into the B-field_ returns an incorrect `value`; and
 * Indeterminacy errors (later described as occurring at a frequency of $\beta$) in which the `get` operation for a `key` returns an `Indeterminate` instead of a specific `value`. Note that this error can occur for both `keys` that were inserted into the B-field as well as those that were not. 
 
-Both of these categories of error can be minimized with appropriate [parameter selection](#parameter-selection), and it is trivial to achieve a zero or near-zero indeterminacy error rate (i.e., $\beta\approx0$).
+Both error categories can be minimized with appropriate [parameter selection](#parameter-selection), and it is trivial to achieve a zero or near-zero indeterminacy error rate (i.e., $\beta\approx0$).
 
 ### _Space Requirements_
 While the space requirements for a B-field depends on the number of discrete values and the desired error rates, the following examples are illustrative use cases:
@@ -52,7 +52,6 @@ Additional documentation can be generated using `cargo docs` and is hosted [on d
 ### _🚧 Current Limitations of the `rust-bfield` Implementation_
 This implementation has several current limitations:
 * **`u32` Values**: Currently, this implementation only permits storing `u32` values, though those can trivially be mapped to any other arbitrary values, e.g., by using them as indices for an array of mapped values (`[value1, value2, value3, ...]`).
-* **Immutable B-fields**: While the B-field data structure can be implemented in a mutable fashion, this implementation only provides an immutable B-field, i.e., `values` **should not be inserted** after the final construction of the B-field.
 * **No Parameter Selection Assistance**: Currently, the `create` function requires manually specifying all of the B-field parameters. A future interface might automatically (and deterministically) select optimal parameters based on input information about the number of discrete `values` ( $\theta$ below) and desired false positive and indeterminacy error rates ( $\alpha$ and $\beta$ below, respectively).
 * **No Higher-Level Insertion Management**: Because creation of a B-field with no indeterminacy error $(\beta\approx0)$ requires setting `n_secondaries` number of inserts (e.g., ~4), it is necessary to iterate through all inserted elements `n_secondaries` times (see [benchmark.rs](benches/benchmark.rs) for a crude example). A higher-level insertion function would take an `Iterable` data structure and manage performing the proper number of repeated insertions for the end-user.
 
@@ -215,7 +214,7 @@ A number of additional extensions to the B-field design are possible, but not im
 ### _When to Consider Alternative Data Structures_
 
 * An associative array or map (e.g., a simple hash table) is likely a better choice when storing `(x, y)` pairs with many distinct `y` values (e.g., storing 1M keys with 800,000 distinct values). See [Formal Data Structure Overview](#formal-data-structure-overview) and [Parameter Selection](#parameter-selection) for further details on optimal use cases for a B-field.
-* A [[minimal] perfect hash function](https://en.wikipedia.org/wiki/Perfect_hash_function) (possibly fronted by a Bloom filter or other data structure supporting set membership queries) is a better choice for any injective function mappings, where there is one unique $y$ value for each $x$ (e.g., de Bruijn graph implementations)
+* A [[minimal] perfect hash function](https://en.wikipedia.org/wiki/Perfect_hash_function#Minimal_perfect_hash_function) (possibly fronted by a Bloom filter or other data structure supporting set membership queries) is a better choice for any injective function mappings, where there is one unique $y$ value for each $x$ (e.g., de Bruijn graph implementations)
 * Despite [reducing to a Bloom filter when configured with the appropriate parameters](), a Bloom filter (or perhaps [xor filter](https://lemire.me/blog/2019/12/19/xor-filters-faster-and-smaller-than-bloom-filters/)) is a better choice than a B-field for supporting simple set membership queries
 * [...] **[Bloomier filter???]**
 * [...] **[Combinatorial bloom filter???]**
