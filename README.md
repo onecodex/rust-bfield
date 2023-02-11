@@ -32,19 +32,47 @@ This implementation provides the following core functionality:
 * A B-field can be created with the `create` function (see [parameter selection](#parameter-selection) for additional details) and then by iteratively inserting `(key, value)` pairs with the `insert` function:
 
 ```rust
-...
+use bfield::BField;
+
+let tmp_dir = tempfile::tempdir().unwrap();
+
+// Create a B-field in a temporary directory
+// with a 1M bit array, 10 hash functions (k), a marker
+// width of 39 (ν), weight of 4 (κ), 4 secondary arrays, and
+// an uncorrected β error of 0.1
+let mut bfield: BField<String> = BField::create(
+    "/tmp/",         // directory
+    "bfield",        // filename (used as base filename)
+    1_000_000,       // size (in bits)
+    10,              // n_hashes (k)
+    39,              // marker_width (ν)
+    4,               // n_marker_bits (weight / κ)
+    0.1,             // secondary_scaledown (uncorrected β)
+    0.025,           // max_scaledown
+    4,               // n_secondaries
+    false,           // in_memory
+    String::new()    // other_params
+).expect("Failed to build B-field");
+
+// Insert integers 0-10,000 as key-value pairs (10k keys, 10k distinct values)
+for p in 0..4u32 {
+    for i in 0..10_000u32 {
+        bfield.insert(&i.to_be_bytes().to_vec(), i, p as usize);
+    }
+}
 ```
 
-* After creation, a B-field can optionally be loaded from a directory containing the produced `mmap` and related files with the `load` function:
+* After creation, a B-field can optionally be loaded from a directory containing the produced `mmap` and related files with the `load` function. And once created or loaded, a B-field can be directly queried using the `get` function, which will either return `None`, `Indeterminate`, or `Some(BFieldValue)` (which is currently an alias for `Some(u32)` see [limitations](#⚠️-current-limitations-of-the-rust-bfield-implementation) below for more details):
 
 ```rust
-...
-```
+use bfield::BField;
 
-* And once created or loaded, a B-field can be directly queried using the `get` function, which will either return `None`, `Indeterminate`, or `Some(BFieldValue)` (which is currently an alias for `Some(u32)` see [limitations](#⚠️-current-limitations-of-the-rust-bfield-implementation) below for more details):
+// Load based on filename of the first array ".0.bfd"
+let bfield: BField<String> = BField::load("/tmp/bfield.0.bfd", true).expect("Failed to load B-field");
 
-```rust
-...
+for i in 0..10_000u32 {
+    let value = bfield.get(&i.to_be_bytes().to_vec());
+}
 ```
 
 Additional documentation can be generated using `cargo docs` and is hosted [on docs.rs](...) for the latest `rust-bfield` release.
