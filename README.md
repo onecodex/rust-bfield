@@ -2,7 +2,7 @@
 
 The B-field is a novel, probabilistic data structure for storing key-value pairs (or, said differently, it is a probabilistic associative array or map). B-fields support insertion (`insert`) and lookup (`get`) operations, and share a number of mathematical and performance properties with the well-known [Bloom filter](https://doi.org/10.1145/362686.362692).
 
-At [One Codex](https://www.onecodex.com), we use the `rust-bfield` crate in bioinformatics applications to efficiently store associations between billions of $k$-length nucleotide substrings (["k-mers"](https://en.wikipedia.org/wiki/K-mer)) and [their taxonomic identity](https://www.ncbi.nlm.nih.gov/taxonomy) _**using only X-Y bytes per `(kmer, value)` pair.**_ We hope others are able to use this library (or implementations in other languages) for applications in bioinformatics and beyond.
+At [One Codex](https://www.onecodex.com), we use the `rust-bfield` crate in bioinformatics applications to efficiently store associations between billions of $k$-length nucleotide substrings (["k-mers"](https://en.wikipedia.org/wiki/K-mer)) and [their taxonomic identity](https://www.ncbi.nlm.nih.gov/taxonomy) _**using only 6-7 bytes per `(kmer, value)` pair**_ for up to 100,000 unique taxonomic IDs (distinct values) and a 0.1% error rate. We hope others are able to use this library (or implementations in other languages) for applications in bioinformatics and beyond.
 
 > _Note: In the [Implementation Details](#implementation-details) section below, we detail the use of this B-field implementation in Rust and use `code` formatting and English parameter names (e.g., we discuss the B-field being a data structure for storing `(key, value)` pairs). In the following [Formal Data Structure Details](#formal-data-structure-details) section, we detail the design and mechanics of the B-field using mathematical notation (i.e., we discuss it as an associate array mapping a set of_ $(x, y)$ _pairs). The generated Rust documentation includes both notations for ease of reference._
 
@@ -18,12 +18,21 @@ Both error categories can be minimized with appropriate [parameter selection](#p
 ### _Space Requirements_
 While the space requirements for a B-field depends on the number of discrete values and the desired error rates, the following examples are illustrative use cases:
 
-* [...] web URL use case
-    
-    * Example Parameters: X, Y, Z
+* Store 1 billion web URLs and...
+  
+  * Assign each of them one of a small number of categories values (n=8) in 2.22Gb (params include ν=8, κ=1, 𝛼=0.1%; 19 bits per element)
+  * Store their IPv4 prefix (n=32) in 3.16Gb (ν=24, κ=2, 𝛼=0.1%; 27 bits per element)
+  * Store their IP in an `0.0.0.0/8` address block (n=16,777,216) in 8.9Gb (ν=51, κ=6, 𝛼=0.1%; 76 bits per element)
+  * Determine if they are part of the set (a Bloom filter!) in 1.75Gb (params include ν=1, κ=1, 𝛼=0.1%; 15 bits per element)
 
-* [...] DNA k-mer use case
-* [...] AA k-mer use case
+    > _We don't estimate space savings over alternative data structures, but any structure storing URLs averaging ~40 bytes per key will several-fold larger than even a B-field associating keys with ~16M distinct values._
+
+* Store 1 billion DNA or RNA _k_-mers ("ACGTA...") and...
+  * Associate them with any of the ~500k bacterial IDs current described by NCBI in 6.93Gb (ν=62, κ=4, 𝛼=0.1%; 59 bits per element)
+  * Store which of 1000 datasets they were most frequently observed in using 3.65Gb (ν=46, κ=2, 𝛼=0.1%; 31 bits per element)
+  * Quantify their abundance in a dataset(s) (say with ~100 quantized values) in 2.91Gb (ν=15, κ=2, 𝛼=0.1%; 25 bits per element)
+
+    > _Compare this to a naive implementation storing 2-bit encoded 32-mers (or 8 amino acid character) and an associated 32 bit value, requiring 96 bits per element without any indexing or data structure overhead._
 
 
 ### _🛠 Supported Operations & Example Code_
