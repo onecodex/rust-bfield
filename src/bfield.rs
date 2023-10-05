@@ -312,6 +312,7 @@ mod tests {
     }
 }
 
+// Causes cargo test to run doc tests on all `rust` code blocks
 #[doc = include_str!("../README.md")]
 #[cfg(doctest)]
-pub struct ReadmeDoctests;
+struct ReadmeDoctests;

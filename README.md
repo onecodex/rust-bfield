@@ -73,7 +73,7 @@ for p in 0..4u32 {
 
 * After creation, a B-field can optionally be loaded from a directory containing the produced `mmap` and related files with the `load` function. And once created or loaded, a B-field can be directly queried using the `get` function, which will either return `None`, `Indeterminate`, or `Some(BFieldValue)` (which is currently an alias for `Some(u32)` see [limitations](#⚠️-current-limitations-of-the-rust-bfield-implementation) below for more details):
 
-```rust
+```rust no_run
 use bfield::BField;
 
 // Load based on filename of the first array ".0.bfd"
