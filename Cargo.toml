@@ -1,8 +1,20 @@
 [package]
 name = "bfield"
-version = "0.2.1"
-authors = ["Roderick Bovee <roderick@onecodex.com>"]
+description = "B-field datastructure implementation in Rust"
+version = "0.3.0"
+authors = ["Vincent Prouillet <vincent@onecodex.com>", "Gerrit Gerritsen <gerrit@onecodex.com>", "Nick Greenfield <nick@onecodex.com>"]
+homepage = "https://github.com/onecodex/rust-bfield/"
+repository = "https://github.com/onecodex/rust-bfield/"
+readme = "README.md"
+keywords = ["B-field", "probabilistic data structures"]
+categories = ["data-structures"]
 edition = "2018"
+license = "Apache 2.0"
+exclude = [
+    ".gitignore",
+    ".github/*",
+    "docs/*",
+]
 
 [dependencies]
 bincode = "1"
