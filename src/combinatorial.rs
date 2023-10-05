@@ -63,9 +63,9 @@ pub fn unrank(marker: u128) -> usize {
     value as usize
 }
 
-/// (Hopefully) fast implementation of a binomial
+/// (Hopefully) fast implementation of a binomial.
 ///
-/// This uses a preset group of equations for k < 8 and then falls back to a
+/// This function uses a preset group of equations for k < 8 and then falls back to a
 /// multiplicative implementation that tries to prevent overflows while
 /// maintaining all results as exact integers.
 #[inline]
