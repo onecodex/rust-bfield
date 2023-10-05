@@ -4,3 +4,4 @@ Cargo.lock
 .DS_Store
 .idea/
 old/
+docs/notebook/.python-version
