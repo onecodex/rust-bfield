@@ -6,10 +6,10 @@ authors = ["Vincent Prouillet <vincent@onecodex.com>", "Gerrit Gerritsen <gerrit
 homepage = "https://github.com/onecodex/rust-bfield/"
 repository = "https://github.com/onecodex/rust-bfield/"
 readme = "README.md"
-keywords = ["B-field", "probabilistic data structures"]
+keywords = ["B-field"]
 categories = ["data-structures"]
 edition = "2018"
-license = "Apache 2.0"
+license = "Apache-2.0"
 exclude = [
     ".gitignore",
     ".github/*",
