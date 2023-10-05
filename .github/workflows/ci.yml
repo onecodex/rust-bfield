@@ -2,7 +2,7 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
 
 jobs:
@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@main
 
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.60.0
+          toolchain: stable
           override: true
 
       - name: version info
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@main
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@main
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@main
 
       - uses: actions-rs/toolchain@v1
         with:
