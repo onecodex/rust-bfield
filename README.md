@@ -92,7 +92,7 @@ Additional documentation can be generated using `cargo docs` and is hosted [on d
 This implementation has several current limitations:
 * **`u32` Values**: Currently, this implementation only permits storing `u32` values, though those can trivially be mapped to any other arbitrary values, e.g., by using them as indices for an array of mapped values (`[value1, value2, value3, ...]`).
 * **No Parameter Selection Assistance**: Currently, the `create` function requires manually specifying all of the B-field parameters. A future interface might automatically (and deterministically) select optimal parameters based on input information about the number of discrete `values` ( $\theta$ below) and desired false positive and indeterminacy error rates ( $\alpha$ and $\beta$ below, respectively).
-* **No Higher-Level Insertion Management**: Because creation of a B-field with no indeterminacy error $(\beta\approx0)$ requires setting `n_secondaries` number of inserts (e.g., ~4), it is necessary to iterate through all inserted elements `n_secondaries` times (see [benchmark.rs](benches/benchmark.rs) for a crude example). A higher-level insertion function would take an `Iterable` data structure and manage performing the proper number of repeated insertions for the end-user.
+* **No Higher-Level Insertion Management**: Because creation of a B-field with no indeterminacy error $(\beta\approx0)$ requires setting `n_secondaries` number of inserts (e.g., ~4), it is necessary to iterate through all inserted elements `n_secondaries` times (see [benchmark.rs](https://github.com/onecodex/rust-bfield/blob/main/benches/benchmark.rs) for a crude example). A higher-level insertion function would take an `Iterable` data structure and manage performing the proper number of repeated insertions for the end-user.
 
 
 ## Formal Data Structure Details
@@ -242,7 +242,7 @@ To briefly summarize, a B-field is a probabilistic associative array or map with
 
 ### _Parameter Selection_
 An efficient B-field requires optimal selection of $\nu$, $\kappa$, the B-field $\mathtt{Array_{0}}$ size $(m\kappa)$, and calculation of the required scaling factor for secondary arrays (uncorrected $\beta$). The 
-[parameter selection notebook](docs/notebook/calculate-parameters.ipynb) included here provides a template for computing these parameters.
+[parameter selection notebook](https://github.com/onecodex/rust-bfield/blob/main/docs/notebook/calculate-parameters.ipynb) included here provides a template for computing these parameters.
 
 ### _Extensions_
 A number of additional extensions to the B-field design are possible, but not implemented here. Several are outlined below:
