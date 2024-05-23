@@ -2,11 +2,13 @@
 
 [![Crates.io Version](https://img.shields.io/crates/v/bfield.svg)](https://crates.io/crates/bfield)
 
-The B-field is a novel, probabilistic data structure for storing key-value pairs (or, said differently, it is a probabilistic associative array or map). B-fields support insertion (`insert`) and lookup (`get`) operations, and share a number of mathematical and performance properties with the well-known [Bloom filter](https://doi.org/10.1145/362686.362692).
+The B-field is a novel, probabilistic data structure for storing key-value pairs (or, said differently, it is a probabilistic associative array or map). B-fields support insertion (`insert`) and lookup (`get`) operations, and share a number of mathematical and performance properties with the well-known [Bloom filter](https://doi.org/10.1145/362686.362692). A B-field lookup will **always return the correct value for any inserted key**,<sup>1</sup> but may return a false positive for keys not in the B-field.
 
 At [One Codex](https://www.onecodex.com), we use the `rust-bfield` crate in bioinformatics applications to efficiently store associations between billions of $k$-length nucleotide substrings (["k-mers"](https://en.wikipedia.org/wiki/K-mer)) and [their taxonomic identity](https://www.ncbi.nlm.nih.gov/taxonomy) _**using only 6-7 bytes per `(kmer, value)` pair**_ for up to 100,000 unique taxonomic IDs (distinct values) and a 0.1% error rate. We hope others are able to use this library (or implementations in other languages) for applications in bioinformatics and beyond.
 
-> _Note: In the [Implementation Details](#implementation-details) section below, we detail the use of this B-field implementation in Rust and use `code` formatting and English parameter names (e.g., we discuss the B-field being a data structure for storing `(key, value)` pairs). In the following [Formal Data Structure Details](#formal-data-structure-details) section, we detail the design and mechanics of the B-field using mathematical notation (i.e., we discuss it as an associate array mapping a set of_ $(x, y)$ _pairs). The [generated Rust documentation](https://docs.rs/bfield/latest/bfield/) includes both notations for ease of reference._
+> _Note: In the [Implementation Details](#implementation-details) section below, we detail the use of this B-field implementation in Rust and use `code` formatting and English parameter names (e.g., we discuss the B-field being a data structure for storing `(key, value)` pairs). In the following [Formal Data Structure Details](#formal-data-structure-details) section, we detail the design and mechanics of the B-field using mathematical notation (i.e., we discuss it as an associate array mapping a set of_ $(x, y)$ _pairs). The [generated Rust documentation](https://docs.rs/bfield/latest/bfield/) includes both notations for ease of reference.
+>
+> _<sup>1</sup> The lookup of an inserted key may also return an indeterminate value depending on the B-field configuration, but this is tunable to a ~0 error rate. See below for more details._
 
 ## Implementation Details
 
@@ -86,13 +88,13 @@ for i in 0..10_000u32 {
 }
 ```
 
-Additional documentation can be generated using `cargo docs` and is hosted [on docs.rs](...) for the latest `rust-bfield` release.
+Additional documentation can be generated using `cargo docs` and is hosted [on docs.rs](https://docs.rs/bfield/0.3.0/bfield/) for the latest `rust-bfield` release.
 
 ### _🚧 Current Limitations of the `rust-bfield` Implementation_
 This implementation has several current limitations:
 * **`u32` Values**: Currently, this implementation only permits storing `u32` values, though those can trivially be mapped to any other arbitrary values, e.g., by using them as indices for an array of mapped values (`[value1, value2, value3, ...]`).
 * **No Parameter Selection Assistance**: Currently, the `create` function requires manually specifying all of the B-field parameters. A future interface might automatically (and deterministically) select optimal parameters based on input information about the number of discrete `values` ( $\theta$ below) and desired false positive and indeterminacy error rates ( $\alpha$ and $\beta$ below, respectively).
-* **No Higher-Level Insertion Management**: Because creation of a B-field with no indeterminacy error $(\beta\approx0)$ requires setting `n_secondaries` number of inserts (e.g., ~4), it is necessary to iterate through all inserted elements `n_secondaries` times (see [benchmark.rs](benches/benchmark.rs) for a crude example). A higher-level insertion function would take an `Iterable` data structure and manage performing the proper number of repeated insertions for the end-user.
+* **No Higher-Level Insertion Management**: Because creation of a B-field with no indeterminacy error $(\beta\approx0)$ requires setting `n_secondaries` number of inserts (e.g., ~4), it is necessary to iterate through all inserted elements `n_secondaries` times (see [benchmark.rs](https://github.com/onecodex/rust-bfield/blob/main/benches/benchmark.rs) for a crude example). A higher-level insertion function would take an `Iterable` data structure and manage performing the proper number of repeated insertions for the end-user.
 
 
 ## Formal Data Structure Details
@@ -242,7 +244,7 @@ To briefly summarize, a B-field is a probabilistic associative array or map with
 
 ### _Parameter Selection_
 An efficient B-field requires optimal selection of $\nu$, $\kappa$, the B-field $\mathtt{Array_{0}}$ size $(m\kappa)$, and calculation of the required scaling factor for secondary arrays (uncorrected $\beta$). The 
-[parameter selection notebook](docs/notebook/calculate-parameters.ipynb) included here provides a template for computing these parameters.
+[parameter selection notebook](https://github.com/onecodex/rust-bfield/blob/main/docs/notebook/calculate-parameters.ipynb) included here provides a template for computing these parameters.
 
 ### _Extensions_
 A number of additional extensions to the B-field design are possible, but not implemented here. Several are outlined below:
@@ -254,7 +256,7 @@ A number of additional extensions to the B-field design are possible, but not im
 
 * An associative array or map (e.g., a simple hash table) is likely a better choice when storing `(x, y)` pairs with many distinct `y` values (e.g., storing 1M keys with 800,000 distinct values). See [Formal Data Structure Overview](#formal-data-structure-overview) and [Parameter Selection](#parameter-selection) for further details on optimal use cases for a B-field.
 * A [[minimal] perfect hash function](https://en.wikipedia.org/wiki/Perfect_hash_function#Minimal_perfect_hash_function) (possibly paired with a Bloom filter or other data structure supporting set membership queries) is a better choice for any injective function mappings, where there is one unique $y$ value _for each_ $x$ (e.g., de Bruijn graph implementations)
-* Despite [reducing to a Bloom filter when configured with the appropriate parameters](), a Bloom filter (or perhaps [xor filter](https://lemire.me/blog/2019/12/19/xor-filters-faster-and-smaller-than-bloom-filters/)) is a better choice than a B-field for supporting simple set membership queries
+* Despite reducing to a Bloom filter when configured with the appropriate parameters, a Bloom filter (or perhaps [xor filter](https://lemire.me/blog/2019/12/19/xor-filters-faster-and-smaller-than-bloom-filters/)) is a better choice than a B-field for supporting simple set membership queries
 
 ### _History_
 The B-field data structure was developed by Nick Greenfield ([@boydgreenfield](https://github.com/boydgreenfield)) in collaboration with Nik Krumm ([@nkrumm](https://github.com/nkrumm)) in 2013 as part of a metagenomics classifier developed under DTRA's 2013 Algorithm Challenge (some details on on Jonathan Eisen's blog [here](https://phylogenomics.me/tag/dtra/), primary content no longer online). After initial proof-of-concept implementations in Python, Cython, and C, a Nim implementation was developed in 2014 by [@boydgreenfield](https://github.com/boydgreenfield) and used in production for ~4 years as part of One Codex's core metagenomics classifier (first described [here](https://www.biorxiv.org/content/10.1101/027607v2)). Dominik Picheta ([@dom96](https://github.com/dom96)) and Alex Bowe ([@alexbowe](https://github.com/alexbowe)) contributed additional enhancements and ideas to the `nim-bfield` implementation in 2015. 
