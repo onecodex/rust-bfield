@@ -101,7 +101,7 @@ This implementation has several current limitations:
 
 ### _Overview_
 
-In contrast to Bloom filters, which only support set membership queries, B-fields enable efficiently storing a set of $x, y$ key-value pairs, where $S$ is the set of $n$ stored $x$ values $(|S|=n)$, $D$ is the set of all possible $y$ values $(f:S \to D)$, and $\theta$ represents the "value range" of the B-field $(max(D)=\theta)$. Put differently, if $f(x)=y$ is the function that maps all $x$ values to their corresponding $y$ value, such that $f(x)=y$, $D$ is the domain of the function $f(x)$.
+In contrast to Bloom filters, which only support set membership queries, B-fields enable efficiently storing a set of $x, y$ key-value pairs, where $S$ is the set of $n$ stored $x$ values $(|S|=n)$, $D$ is the set of all possible $y$ values $(f:S \to D)$, and $\theta$ represents the "value range" of the B-field $(max(D)=\theta)$. Put differently, if $f(x)=y$ is the function that maps all $x$ values to their corresponding $y$ value, such that $f(x)=y$, $D$ is the range of the function $f(x)$.
 
 B-fields have a number of advantages of other probabilistic and deterministic data structures for associating keys and values. Specifically, B-fields exhibit a unique combination of properties that makes them ideal for storing very large sets of keys mapped to a modest number of discrete values:
 
