@@ -86,7 +86,7 @@ for i in 0..10_000u32 {
 }
 ```
 
-Additional documentation can be generated using `cargo docs` and is hosted [on docs.rs](...) for the latest `rust-bfield` release.
+Additional documentation can be generated using `cargo docs` and is hosted [on docs.rs](https://docs.rs/bfield/0.3.0/bfield/) for the latest `rust-bfield` release.
 
 ### _🚧 Current Limitations of the `rust-bfield` Implementation_
 This implementation has several current limitations:
@@ -254,7 +254,7 @@ A number of additional extensions to the B-field design are possible, but not im
 
 * An associative array or map (e.g., a simple hash table) is likely a better choice when storing `(x, y)` pairs with many distinct `y` values (e.g., storing 1M keys with 800,000 distinct values). See [Formal Data Structure Overview](#formal-data-structure-overview) and [Parameter Selection](#parameter-selection) for further details on optimal use cases for a B-field.
 * A [[minimal] perfect hash function](https://en.wikipedia.org/wiki/Perfect_hash_function#Minimal_perfect_hash_function) (possibly paired with a Bloom filter or other data structure supporting set membership queries) is a better choice for any injective function mappings, where there is one unique $y$ value _for each_ $x$ (e.g., de Bruijn graph implementations)
-* Despite [reducing to a Bloom filter when configured with the appropriate parameters](), a Bloom filter (or perhaps [xor filter](https://lemire.me/blog/2019/12/19/xor-filters-faster-and-smaller-than-bloom-filters/)) is a better choice than a B-field for supporting simple set membership queries
+* Despite reducing to a Bloom filter when configured with the appropriate parameters, a Bloom filter (or perhaps [xor filter](https://lemire.me/blog/2019/12/19/xor-filters-faster-and-smaller-than-bloom-filters/)) is a better choice than a B-field for supporting simple set membership queries
 
 ### _History_
 The B-field data structure was developed by Nick Greenfield ([@boydgreenfield](https://github.com/boydgreenfield)) in collaboration with Nik Krumm ([@nkrumm](https://github.com/nkrumm)) in 2013 as part of a metagenomics classifier developed under DTRA's 2013 Algorithm Challenge (some details on on Jonathan Eisen's blog [here](https://phylogenomics.me/tag/dtra/), primary content no longer online). After initial proof-of-concept implementations in Python, Cython, and C, a Nim implementation was developed in 2014 by [@boydgreenfield](https://github.com/boydgreenfield) and used in production for ~4 years as part of One Codex's core metagenomics classifier (first described [here](https://www.biorxiv.org/content/10.1101/027607v2)). Dominik Picheta ([@dom96](https://github.com/dom96)) and Alex Bowe ([@alexbowe](https://github.com/alexbowe)) contributed additional enhancements and ideas to the `nim-bfield` implementation in 2015. 
