@@ -2,11 +2,13 @@
 
 [![Crates.io Version](https://img.shields.io/crates/v/bfield.svg)](https://crates.io/crates/bfield)
 
-The B-field is a novel, probabilistic data structure for storing key-value pairs (or, said differently, it is a probabilistic associative array or map). B-fields support insertion (`insert`) and lookup (`get`) operations, and share a number of mathematical and performance properties with the well-known [Bloom filter](https://doi.org/10.1145/362686.362692).
+The B-field is a novel, probabilistic data structure for storing key-value pairs (or, said differently, it is a probabilistic associative array or map). B-fields support insertion (`insert`) and lookup (`get`) operations, and share a number of mathematical and performance properties with the well-known [Bloom filter](https://doi.org/10.1145/362686.362692). A B-field lookup will **always return the correct value for any inserted key**,<sup>1</sup> but may return a false positive for keys not in the B-field.
 
 At [One Codex](https://www.onecodex.com), we use the `rust-bfield` crate in bioinformatics applications to efficiently store associations between billions of $k$-length nucleotide substrings (["k-mers"](https://en.wikipedia.org/wiki/K-mer)) and [their taxonomic identity](https://www.ncbi.nlm.nih.gov/taxonomy) _**using only 6-7 bytes per `(kmer, value)` pair**_ for up to 100,000 unique taxonomic IDs (distinct values) and a 0.1% error rate. We hope others are able to use this library (or implementations in other languages) for applications in bioinformatics and beyond.
 
-> _Note: In the [Implementation Details](#implementation-details) section below, we detail the use of this B-field implementation in Rust and use `code` formatting and English parameter names (e.g., we discuss the B-field being a data structure for storing `(key, value)` pairs). In the following [Formal Data Structure Details](#formal-data-structure-details) section, we detail the design and mechanics of the B-field using mathematical notation (i.e., we discuss it as an associate array mapping a set of_ $(x, y)$ _pairs). The [generated Rust documentation](https://docs.rs/bfield/latest/bfield/) includes both notations for ease of reference._
+> _Note: In the [Implementation Details](#implementation-details) section below, we detail the use of this B-field implementation in Rust and use `code` formatting and English parameter names (e.g., we discuss the B-field being a data structure for storing `(key, value)` pairs). In the following [Formal Data Structure Details](#formal-data-structure-details) section, we detail the design and mechanics of the B-field using mathematical notation (i.e., we discuss it as an associate array mapping a set of_ $(x, y)$ _pairs). The [generated Rust documentation](https://docs.rs/bfield/latest/bfield/) includes both notations for ease of reference.
+>
+> _<sup>1</sup> The lookup of an inserted key may also return an indeterminate value depending on the B-field configuration, but this is tunable to a ~0 error rate. See below for more details._
 
 ## Implementation Details
 
