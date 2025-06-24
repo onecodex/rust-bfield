@@ -1,7 +1,5 @@
 use std::cell::UnsafeCell;
 use std::cmp::Ordering;
-#[cfg(feature = "prefetching")]
-use std::intrinsics;
 use std::io;
 use std::path::{Path, PathBuf};
 

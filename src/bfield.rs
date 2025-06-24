@@ -29,13 +29,13 @@ impl<T: Clone + DeserializeOwned + Serialize> BField<T> {
     /// [parameter selection notebook](https://github.com/onecodex/rust-bfield/blob/main/docs/notebook/calculate-parameters.ipynb)
     /// for helpful guidance in picking optimal parameters.
     /// - `size` is the primary `BField` size, subsequent `BField` sizes will be determined
-    /// by the `secondary_scaledown` and `max_scaledown` parameters
+    ///   by the `secondary_scaledown` and `max_scaledown` parameters
     /// - `n_hashes`. The number of hash functions _k_ to use.
     /// - `marker_width` or v (nu). The length of the bit-string to use for
     /// - `n_marker_bits` or κ (kappa). The number of 1s to set in each v-length bit-string (also its Hamming weight).
     /// - `secondary_scaledown` or β (beta). The scaling factor to use for each subsequent `BField` size.
     /// - `max_scaledown`. A maximum scaling factor to use for secondary `BField` sizes, since β raised to the power of
-    /// `n_secondaries` can be impractically/needlessly small.
+    ///   `n_secondaries` can be impractically/needlessly small.
     /// - `n_secondaries`. The number of secondary `BField`s to create.
     /// - `in_memory`. Whether to create the `BField` in memory or on disk.
     #[allow(clippy::too_many_arguments)]
